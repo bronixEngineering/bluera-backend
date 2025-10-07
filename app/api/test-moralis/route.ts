@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { walletAddress, include } = await request.json();
+    const { walletAddress, include, tokenAddresses } = await request.json();
     
     const apiKey = process.env.MORALIS_API_KEY;
     
@@ -32,22 +32,41 @@ export async function POST(request: Request) {
     
     const profitabilityUrl = `${baseUrl}/wallets/${walletAddress}/profitability/summary?days=30&chain=base`;
     const walletStatsUrl = `${baseUrl}/wallets/${walletAddress}/stats?chain=base`;
+    
+    // Token balances URL with optional token address filters
+    let tokenBalancesUrl: string | null = null;
+    if (Array.isArray(include) && include.includes('tokenBalances')) {
+      if (!Array.isArray(tokenAddresses) || tokenAddresses.length === 0) {
+        return NextResponse.json(
+          { error: 'tokenBalances requested but tokenAddresses is missing or empty' },
+          { status: 400 }
+        );
+      }
+      const tbParams = new URLSearchParams({ chain: 'base' });
+      for (const addr of tokenAddresses) {
+        if (typeof addr === 'string' && addr.trim()) {
+          tbParams.append('token_addresses[]', addr.trim());
+        }
+      }
+      tokenBalancesUrl = `${baseUrl}/wallets/${walletAddress}/tokens?${tbParams.toString()}`;
+    }
 
     // Determine which endpoints to include
-    const allowedKeys = ['transfers', 'swaps', 'netWorth', 'profitability', 'walletStats'] as const;
+    const allowedKeys = ['transfers', 'swaps', 'netWorth', 'profitability', 'walletStats', 'tokenBalances'] as const;
     const includeSet = new Set(
       Array.isArray(include)
         ? include.filter((k: string) => allowedKeys.includes(k as any))
         : allowedKeys
     );
 
-    const tasks: Array<{ key: 'transfers' | 'swaps' | 'netWorth' | 'profitability' | 'walletStats', name: string, url: string }>
+    const tasks: Array<{ key: 'transfers' | 'swaps' | 'netWorth' | 'profitability' | 'walletStats' | 'tokenBalances', name: string, url: string }>
       = [];
     if (includeSet.has('transfers')) tasks.push({ key: 'transfers', name: 'ERC20 Transfers', url: transfersUrl });
     if (includeSet.has('swaps')) tasks.push({ key: 'swaps', name: 'Swaps', url: swapsUrl });
     if (includeSet.has('netWorth')) tasks.push({ key: 'netWorth', name: 'Net Worth', url: netWorthUrl });
     if (includeSet.has('profitability')) tasks.push({ key: 'profitability', name: 'Profitability', url: profitabilityUrl });
     if (includeSet.has('walletStats')) tasks.push({ key: 'walletStats', name: 'Wallet Stats', url: walletStatsUrl });
+    if (includeSet.has('tokenBalances') && tokenBalancesUrl) tasks.push({ key: 'tokenBalances', name: 'Token Balances', url: tokenBalancesUrl });
 
     // Prepare request details for UI
     const requests = tasks.map(t => ({
@@ -93,6 +112,22 @@ export async function POST(request: Request) {
           transactionsTotal: Number.isFinite(transactionsTotal) ? transactionsTotal : 0,
           tokenTransfersTotal: Number.isFinite(tokenTransfersTotal) ? tokenTransfersTotal : 0,
           totalActivity,
+        };
+      }
+    }
+
+    // Compute derived metrics for token balances if included (only usd_value is needed)
+    if (includeSet.has('tokenBalances')) {
+      const idx = tasks.findIndex(t => t.key === 'tokenBalances');
+      if (idx !== -1) {
+        const tb = parsed[idx] ?? {};
+        const usdValues: number[] = Array.isArray(tb?.result)
+          ? tb.result.map((r: any) => Number(r?.usd_value ?? 0)).map((v: number) => (Number.isFinite(v) ? v : 0))
+          : [];
+        const totalUsdValue = usdValues.reduce((sum, v) => sum + v, 0);
+        data.tokenBalancesComputed = {
+          usdValues,
+          totalUsdValue,
         };
       }
     }

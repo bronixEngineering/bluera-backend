@@ -19,9 +19,10 @@ export default function Home() {
   const [expandedResponses, setExpandedResponses] = useState<{[key: number]: boolean}>({});
   const [showFullRaw, setShowFullRaw] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [include, setInclude] = useState<{ transfers: boolean; swaps: boolean; netWorth: boolean; profitability: boolean }>(
+  const [include, setInclude] = useState<{ transfers: boolean; swaps: boolean; netWorth: boolean; profitability: boolean; walletStats?: boolean; tokenBalances?: boolean }>(
     { transfers: true, swaps: true, netWorth: true, profitability: true }
   );
+  const [tokenAddressesInput, setTokenAddressesInput] = useState('');
 
   const getIncludeArray = () => Object.entries(include)
     .filter(([_, v]) => v)
@@ -36,12 +37,16 @@ export default function Home() {
 
     const walletToTest = customWallet || selectedWallet;
     const includeArr = getIncludeArray();
+    const tokenAddresses = tokenAddressesInput
+      .split(/[\s,\n]+/)
+      .map(s => s.trim())
+      .filter(s => s);
 
     try {
       const response = await fetch('/api/test-moralis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: walletToTest, include: includeArr }),
+        body: JSON.stringify({ walletAddress: walletToTest, include: includeArr, tokenAddresses }),
       });
 
       const data = await response.json();
@@ -206,7 +211,7 @@ export default function Home() {
   const renderSummary = () => {
     if (!results?.success || !results?.data) return null;
 
-    const { transfers, swaps, netWorth, profitability, walletStats, walletStatsComputed } = results.data;
+    const { transfers, swaps, netWorth, profitability, walletStats, walletStatsComputed, tokenBalances, tokenBalancesComputed } = results.data;
     const included = new Set(results.included ?? Object.keys(results.data));
 
     // Calculate swap metrics
@@ -312,6 +317,23 @@ export default function Home() {
             {walletStatsComputed?.transactionsTotal ?? 0} txn • {walletStatsComputed?.tokenTransfersTotal ?? 0} token transfers
           </p>
           <p className="text-xs text-teal-500 mt-1">Click to view details</p>
+        </div>
+        )}
+
+        {/* Token Balances */}
+        {included.has('tokenBalances') && (
+        <div 
+          className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:bg-yellow-100 transition-colors"
+          onClick={() => setActiveDetail('tokenBalances')}
+        >
+          <h4 className="font-semibold text-yellow-800 mb-2">💵 Token Balances</h4>
+          <p className="text-2xl font-bold text-yellow-900">
+            ${Number(tokenBalancesComputed?.totalUsdValue ?? 0).toLocaleString()}
+          </p>
+          <p className="text-sm text-yellow-600">
+            {Array.isArray(tokenBalancesComputed?.usdValues) ? tokenBalancesComputed?.usdValues.length : 0} tokens queried
+          </p>
+          <p className="text-xs text-yellow-500 mt-1">Click to view details</p>
         </div>
         )}
       </div>
@@ -534,7 +556,7 @@ export default function Home() {
           {/* Endpoint selection */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Select endpoints:</label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={include.transfers} onChange={() => setInclude(prev => ({ ...prev, transfers: !prev.transfers }))} />
                 Transfers
@@ -555,8 +577,24 @@ export default function Home() {
                 <input type="checkbox" checked={(include as any).walletStats ?? false} onChange={() => setInclude(prev => ({ ...(prev as any), walletStats: !((prev as any).walletStats ?? false) }))} />
                 Wallet Stats
               </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={(include as any).tokenBalances ?? false} onChange={() => setInclude(prev => ({ ...(prev as any), tokenBalances: !((prev as any).tokenBalances ?? false) }))} />
+                Token Balances
+              </label>
             </div>
           </div>
+
+          {(include as any).tokenBalances && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Token addresses (comma or newline separated):</label>
+              <textarea
+                value={tokenAddressesInput}
+                onChange={(e) => setTokenAddressesInput(e.target.value)}
+                placeholder="0x..., 0x..., 0x..."
+                className="w-full border rounded-lg p-2 h-24"
+              />
+            </div>
+          )}
 
           <button 
             onClick={runTest}
