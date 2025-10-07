@@ -19,6 +19,13 @@ export default function Home() {
   const [expandedResponses, setExpandedResponses] = useState<{[key: number]: boolean}>({});
   const [showFullRaw, setShowFullRaw] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [include, setInclude] = useState<{ transfers: boolean; swaps: boolean; netWorth: boolean; profitability: boolean }>(
+    { transfers: true, swaps: true, netWorth: true, profitability: true }
+  );
+
+  const getIncludeArray = () => Object.entries(include)
+    .filter(([_, v]) => v)
+    .map(([k]) => k);
 
   const runTest = async () => {
     setLoading(true);
@@ -28,12 +35,13 @@ export default function Home() {
     setShowFullRaw(false);
 
     const walletToTest = customWallet || selectedWallet;
+    const includeArr = getIncludeArray();
 
     try {
       const response = await fetch('/api/test-moralis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: walletToTest }),
+        body: JSON.stringify({ walletAddress: walletToTest, include: includeArr }),
       });
 
       const data = await response.json();
@@ -198,7 +206,8 @@ export default function Home() {
   const renderSummary = () => {
     if (!results?.success || !results?.data) return null;
 
-    const { transfers, swaps, netWorth, profitability } = results.data;
+    const { transfers, swaps, netWorth, profitability, walletStats, walletStatsComputed } = results.data;
+    const included = new Set(results.included ?? Object.keys(results.data));
 
     // Calculate swap metrics
     const swapResults = swaps?.result || [];
@@ -218,6 +227,7 @@ export default function Home() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Net Worth */}
+        {included.has('netWorth') && (
         <div 
           className="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 transition-colors"
           onClick={() => setActiveDetail('netWorth')}
@@ -231,8 +241,10 @@ export default function Home() {
           </p>
           <p className="text-xs text-blue-500 mt-1">Click to view details</p>
         </div>
+        )}
 
         {/* Transfers */}
+        {included.has('transfers') && (
         <div 
           className="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 transition-colors"
           onClick={() => setActiveDetail('transfers')}
@@ -246,8 +258,10 @@ export default function Home() {
           </p>
           <p className="text-xs text-green-500 mt-1">Click to view details</p>
         </div>
+        )}
 
         {/* Swaps */}
+        {included.has('swaps') && (
         <div 
           className="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 transition-colors"
           onClick={() => setActiveDetail('swaps')}
@@ -263,8 +277,10 @@ export default function Home() {
             {buySwaps} buys, {sellSwaps} sells
           </p>
         </div>
+        )}
 
         {/* Profitability - FIXED */}
+        {included.has('profitability') && (
         <div 
           className="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:bg-orange-100 transition-colors"
           onClick={() => setActiveDetail('profitability')}
@@ -280,6 +296,24 @@ export default function Home() {
           </p>
           <p className="text-xs text-orange-500 mt-1">Click to view details</p>
         </div>
+        )}
+
+        {/* Wallet Stats */}
+        {included.has('walletStats') && (
+        <div 
+          className="bg-teal-50 border border-teal-200 rounded-lg p-4 cursor-pointer hover:bg-teal-100 transition-colors"
+          onClick={() => setActiveDetail('walletStats')}
+        >
+          <h4 className="font-semibold text-teal-800 mb-2">🧮 Wallet Stats</h4>
+          <p className="text-2xl font-bold text-teal-900">
+            {walletStatsComputed?.totalActivity ?? 0}
+          </p>
+          <p className="text-sm text-teal-600">
+            {walletStatsComputed?.transactionsTotal ?? 0} txn • {walletStatsComputed?.tokenTransfersTotal ?? 0} token transfers
+          </p>
+          <p className="text-xs text-teal-500 mt-1">Click to view details</p>
+        </div>
+        )}
       </div>
     );
   };
@@ -497,9 +531,36 @@ export default function Home() {
             </p>
           )}
           
+          {/* Endpoint selection */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Select endpoints:</label>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={include.transfers} onChange={() => setInclude(prev => ({ ...prev, transfers: !prev.transfers }))} />
+                Transfers
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={include.swaps} onChange={() => setInclude(prev => ({ ...prev, swaps: !prev.swaps }))} />
+                Swaps
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={include.netWorth} onChange={() => setInclude(prev => ({ ...prev, netWorth: !prev.netWorth }))} />
+                Net Worth
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={include.profitability} onChange={() => setInclude(prev => ({ ...prev, profitability: !prev.profitability }))} />
+                Profitability
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={(include as any).walletStats ?? false} onChange={() => setInclude(prev => ({ ...(prev as any), walletStats: !((prev as any).walletStats ?? false) }))} />
+                Wallet Stats
+              </label>
+            </div>
+          </div>
+
           <button 
             onClick={runTest}
-            disabled={loading}
+            disabled={loading || getIncludeArray().length === 0}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
           >
             {loading ? 'Testing...' : 'Run Comprehensive Test'}

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { walletAddress } = await request.json();
+    const { walletAddress, include } = await request.json();
     
     const apiKey = process.env.MORALIS_API_KEY;
     
@@ -31,102 +31,83 @@ export async function POST(request: Request) {
     const netWorthUrl = `${baseUrl}/wallets/${walletAddress}/net-worth?${netWorthParams.toString()}`;
     
     const profitabilityUrl = `${baseUrl}/wallets/${walletAddress}/profitability/summary?days=30&chain=base`;
+    const walletStatsUrl = `${baseUrl}/wallets/${walletAddress}/stats?chain=base`;
 
-    // Prepare request details
-    const requests = [
-      {
-        name: 'ERC20 Transfers',
-        url: transfersUrl,
-        method: 'GET',
-        headers: { 'X-API-Key': '[HIDDEN]' }
-      },
-      {
-        name: 'Swaps',
-        url: swapsUrl,
-        method: 'GET',
-        headers: { 'X-API-Key': '[HIDDEN]' }
-      },
-      {
-        name: 'Net Worth',
-        url: netWorthUrl,
-        method: 'GET',
-        headers: { 'X-API-Key': '[HIDDEN]' }
-      },
-      {
-        name: 'Profitability',
-        url: profitabilityUrl,
-        method: 'GET',
-        headers: { 'X-API-Key': '[HIDDEN]' }
-      }
-    ];
+    // Determine which endpoints to include
+    const allowedKeys = ['transfers', 'swaps', 'netWorth', 'profitability', 'walletStats'] as const;
+    const includeSet = new Set(
+      Array.isArray(include)
+        ? include.filter((k: string) => allowedKeys.includes(k as any))
+        : allowedKeys
+    );
+
+    const tasks: Array<{ key: 'transfers' | 'swaps' | 'netWorth' | 'profitability' | 'walletStats', name: string, url: string }>
+      = [];
+    if (includeSet.has('transfers')) tasks.push({ key: 'transfers', name: 'ERC20 Transfers', url: transfersUrl });
+    if (includeSet.has('swaps')) tasks.push({ key: 'swaps', name: 'Swaps', url: swapsUrl });
+    if (includeSet.has('netWorth')) tasks.push({ key: 'netWorth', name: 'Net Worth', url: netWorthUrl });
+    if (includeSet.has('profitability')) tasks.push({ key: 'profitability', name: 'Profitability', url: profitabilityUrl });
+    if (includeSet.has('walletStats')) tasks.push({ key: 'walletStats', name: 'Wallet Stats', url: walletStatsUrl });
+
+    // Prepare request details for UI
+    const requests = tasks.map(t => ({
+      name: t.name,
+      url: t.url,
+      method: 'GET',
+      headers: { 'X-API-Key': '[HIDDEN]' }
+    }));
 
     // Parallel API calls with timing
     const startTime = Date.now();
     
-    const [transfersRes, swapsRes, netWorthRes, profitabilityRes] = await Promise.all([
-      fetch(transfersUrl, { headers }),
-      fetch(swapsUrl, { headers }),
-      fetch(netWorthUrl, { headers }),
-      fetch(profitabilityUrl, { headers })
-    ]);
+    const fetchResponses = await Promise.all(tasks.map(t => fetch(t.url, { headers })));
 
     const endTime = Date.now();
     const totalTime = endTime - startTime;
 
-    const [transfers, swaps, netWorth, profitability] = await Promise.all([
-      transfersRes.json(),
-      swapsRes.json(),
-      netWorthRes.json(),
-      profitabilityRes.json()
-    ]);
+    const parsed = await Promise.all(fetchResponses.map(r => r.json()));
 
     // Prepare response details
-    const responses = [
-      {
-        name: 'ERC20 Transfers',
-        status: transfersRes.status,
-        statusText: transfersRes.statusText,
-        data: transfers,
-        size: JSON.stringify(transfers).length
-      },
-      {
-        name: 'Swaps',
-        status: swapsRes.status,
-        statusText: swapsRes.statusText,
-        data: swaps,
-        size: JSON.stringify(swaps).length
-      },
-      {
-        name: 'Net Worth',
-        status: netWorthRes.status,
-        statusText: netWorthRes.statusText,
-        data: netWorth,
-        size: JSON.stringify(netWorth).length
-      },
-      {
-        name: 'Profitability',
-        status: profitabilityRes.status,
-        statusText: profitabilityRes.statusText,
-        data: profitability,
-        size: JSON.stringify(profitability).length
+    const responses = fetchResponses.map((res, idx) => ({
+      name: tasks[idx].name,
+      status: res.status,
+      statusText: res.statusText,
+      data: parsed[idx],
+      size: JSON.stringify(parsed[idx]).length
+    }));
+
+    // Build data object keyed by requested endpoints
+    const data: Record<string, any> = {};
+    tasks.forEach((t, idx) => { data[t.key] = parsed[idx]; });
+
+    // Compute derived metrics for wallet stats if included
+    if (includeSet.has('walletStats')) {
+      const idx = tasks.findIndex(t => t.key === 'walletStats');
+      if (idx !== -1) {
+        const stats = parsed[idx] ?? {};
+        const transactionsTotal = Number(stats?.transactions?.total ?? 0);
+        const tokenTransfersTotal = Number(stats?.token_transfers?.total ?? 0);
+        const totalActivity = (Number.isFinite(transactionsTotal) ? transactionsTotal : 0)
+          + (Number.isFinite(tokenTransfersTotal) ? tokenTransfersTotal : 0);
+        data.walletStatsComputed = {
+          transactionsTotal: Number.isFinite(transactionsTotal) ? transactionsTotal : 0,
+          tokenTransfersTotal: Number.isFinite(tokenTransfersTotal) ? tokenTransfersTotal : 0,
+          totalActivity,
+        };
       }
-    ];
+    }
 
     return NextResponse.json({
       success: true,
       wallet: walletAddress,
       timing: {
         totalTime: `${totalTime}ms`,
-        requestCount: 4
+        requestCount: tasks.length
       },
       requests,
       responses,
-      data: {
-        transfers,
-        swaps,
-        netWorth,
-        profitability
-      },
+      included: Array.from(includeSet),
+      data,
       timestamp: new Date().toISOString(),
     });
 
