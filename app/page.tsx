@@ -13,7 +13,6 @@ const TEST_WALLETS = [
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
-  const [selectedWallet, setSelectedWallet] = useState(TEST_WALLETS[0].address);
   const [customWallet, setCustomWallet] = useState('');
   const [expandedResponses, setExpandedResponses] = useState<{[key: number]: boolean}>({});
   const [showFullRaw, setShowFullRaw] = useState(false);
@@ -33,7 +32,7 @@ export default function Home() {
     setExpandedResponses({});
     setShowFullRaw(false);
 
-    const walletToTest = customWallet || selectedWallet;
+    const walletToTest = customWallet;
     const includeArr = getIncludeArray();
     const fid = fidInput && !isNaN(Number(fidInput)) ? Number(fidInput) : undefined;
 
@@ -370,24 +369,9 @@ export default function Home() {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Select Test Wallet:</label>
-              <select 
-                value={selectedWallet}
-                onChange={(e) => setSelectedWallet(e.target.value)}
-                className="w-full border rounded-lg p-2"
-                disabled={customWallet !== ''}
-              >
-                {TEST_WALLETS.map((wallet) => (
-                  <option key={wallet.address} value={wallet.address}>
-                    FID: {wallet.fid} - {wallet.address}
-                  </option>
-                ))}
-              </select>
-            </div>
             
             <div>
-              <label className="block text-sm font-medium mb-2">Or Enter Custom Wallet:</label>
+              <label className="block text-sm font-medium mb-2">Enter Wallet:</label>
               <input
                 type="text"
                 value={customWallet}
