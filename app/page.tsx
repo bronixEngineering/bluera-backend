@@ -23,6 +23,7 @@ export default function Home() {
     { transfers: true, swaps: true, netWorth: true, profitability: true }
   );
   const [tokenAddressesInput, setTokenAddressesInput] = useState('');
+  const [fidInput, setFidInput] = useState('');
 
   const getIncludeArray = () => Object.entries(include)
     .filter(([_, v]) => v)
@@ -41,12 +42,13 @@ export default function Home() {
       .split(/[\s,\n]+/)
       .map(s => s.trim())
       .filter(s => s);
+    const fid = fidInput && !isNaN(Number(fidInput)) ? Number(fidInput) : undefined;
 
     try {
       const response = await fetch('/api/test-moralis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: walletToTest, include: includeArr, tokenAddresses }),
+        body: JSON.stringify({ walletAddress: walletToTest, include: includeArr, tokenAddresses, fid }),
       });
 
       const data = await response.json();
@@ -547,6 +549,18 @@ export default function Home() {
             </div>
           </div>
 
+          {/* FID input */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">FID (optional):</label>
+            <input
+              type="text"
+              value={fidInput}
+              onChange={(e) => setFidInput(e.target.value)}
+              placeholder="e.g. 569188"
+              className="w-full border rounded-lg p-2"
+            />
+          </div>
+
           {customWallet && (
             <p className="text-sm text-blue-600 mb-4">
               Using custom wallet: {customWallet}
@@ -606,8 +620,62 @@ export default function Home() {
         </div>
 
         {results && results.success && renderSummary()}
+
+        {/* Wallets Status summary card */}
+        {results && results.success && results.walletsStatus && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4">Wallets Status (Saved to Supabase)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="bg-gray-50 p-4 rounded">
+                <div className="text-sm text-gray-600">Wallet</div>
+                <div className="font-mono text-xs break-all">{results.walletsStatus.wallet_address}</div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded">
+                <div className="text-sm text-gray-600">Total Tx Count</div>
+                <div className="font-semibold">{results.walletsStatus.total_tx_count ?? 0}</div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded">
+                <div className="text-sm text-gray-600">Total Volume</div>
+                <div className="font-semibold">${Number(results.walletsStatus.total_volume ?? 0).toLocaleString()}</div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded">
+                <div className="text-sm text-gray-600">Net Worth</div>
+                <div className="font-semibold">${Number(results.walletsStatus.net_worth ?? 0).toLocaleString()}</div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded">
+                <div className="text-sm text-gray-600">PnL</div>
+                <div className={`font-semibold ${Number(results.walletsStatus.pnl ?? 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  ${Number(results.walletsStatus.pnl ?? 0).toLocaleString()}
+                </div>
+              </div>
+            </div>
+            <div className="text-sm mt-3">
+              <span className={`px-2 py-1 rounded ${results.db?.success ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                {results.db?.success ? 'Saved to Supabase' : 'Not saved to Supabase'}
+              </span>
+              {!results.db?.success && results.db?.error && (
+                <span className="ml-2 text-red-600">{results.db.error}</span>
+              )}
+            </div>
+          </div>
+        )}
         
         {results && results.success && renderRequestResponse()}
+
+        {/* FID save status */}
+        {results && results.dbFid && (
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium">FID Save:</span>
+              <span className={`px-2 py-1 rounded ${results.dbFid.success ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                {results.dbFid.success ? 'Saved' : 'Not saved'}
+              </span>
+              {!results.dbFid.success && results.dbFid.error && (
+                <span className="text-red-600">{results.dbFid.error}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {results && (
           <div className="bg-white rounded-lg shadow p-6">

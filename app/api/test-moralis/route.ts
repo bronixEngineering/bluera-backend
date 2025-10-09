@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { walletAddress, include, tokenAddresses } = await request.json();
+    const { walletAddress, include, tokenAddresses, fid } = await request.json();
     
     const apiKey = process.env.MORALIS_API_KEY;
     
@@ -132,6 +133,63 @@ export async function POST(request: Request) {
       }
     }
 
+    // Compute consolidated metrics for wallets_status
+    const totalSwapVolume = (() => {
+      const swaps = data.swaps;
+      const arr = Array.isArray(swaps?.result) ? swaps.result : [];
+      return arr.reduce((sum: number, s: any) => {
+        const v = s?.totalValueUsd ?? s?.value_usd ?? 0;
+        const num = typeof v === 'string' ? parseFloat(v) : Number(v);
+        return sum + (Number.isFinite(num) ? num : 0);
+      }, 0);
+    })();
+
+    const netWorthUsd = (() => {
+      const v = data.netWorth?.total_networth_usd;
+      const num = typeof v === 'string' ? parseFloat(v) : Number(v);
+      return Number.isFinite(num) ? num : 0;
+    })();
+
+    const pnlUsd = (() => {
+      const prof = data.profitability;
+      const v = prof?.total_usd_pnl ?? prof?.total_realized_profit_usd ?? 0;
+      const num = typeof v === 'string' ? parseFloat(v) : Number(v);
+      return Number.isFinite(num) ? num : 0;
+    })();
+
+    const totalActivity = data.walletStatsComputed?.totalActivity ?? null;
+
+    const walletsStatus = {
+      wallet_address: walletAddress,
+      total_tx_count: totalActivity,
+      total_volume: totalSwapVolume,
+      net_worth: netWorthUsd,
+      pnl: pnlUsd,
+      fid: null as number | null,
+    };
+
+    // Attempt Supabase upsert (non-fatal)
+    let db = { success: false as boolean, error: null as string | null };
+    let dbFid = { success: false as boolean, error: null as string | null };
+    try {
+      const supabase = getSupabaseServerClient();
+      const { error: upsertError } = await supabase
+        .from('wallets_status')
+        .upsert([walletsStatus], { onConflict: 'wallet_address' });
+      if (upsertError) db = { success: false, error: upsertError.message };
+      else db = { success: true, error: null };
+
+      if (typeof fid === 'number' && Number.isFinite(fid)) {
+        const { error: fidError } = await supabase
+          .from('users_fid')
+          .upsert([{ fid }], { onConflict: 'fid' });
+        if (fidError) dbFid = { success: false, error: fidError.message };
+        else dbFid = { success: true, error: null };
+      }
+    } catch (e: any) {
+      db = { success: false, error: e?.message ?? 'Unknown error' };
+    }
+
     return NextResponse.json({
       success: true,
       wallet: walletAddress,
@@ -143,6 +201,9 @@ export async function POST(request: Request) {
       responses,
       included: Array.from(includeSet),
       data,
+      walletsStatus,
+      db,
+      dbFid,
       timestamp: new Date().toISOString(),
     });
 

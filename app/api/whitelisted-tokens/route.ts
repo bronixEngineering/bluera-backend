@@ -7,7 +7,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from('whitelisted_tokens')
-      .select('token_address, token_name, token_ticker, token_decimals');
+      .select('token_address, token_ticker, token_decimals');
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
