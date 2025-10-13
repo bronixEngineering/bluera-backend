@@ -9,11 +9,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.74.0",
+    "@trigger.dev/sdk": "^4.0.4",
     "next": "14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@trigger.dev/build": "^4.0.4",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
