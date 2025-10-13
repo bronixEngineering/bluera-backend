@@ -160,6 +160,110 @@ export async function POST(request: Request) {
       }
     })();
 
+let tokenSwapTotalsUpdate: { success: boolean; updated: number; error?: string } = { success: true, updated: 0 };
+try {
+  // Build a map of existing token_address (original casing) keyed by lowercase
+const existingTokenMap = new Map<string, string>();
+(whitelistRows || []).forEach((r: any) => {
+  const orig = String(r?.token_address || '');
+  if (orig) existingTokenMap.set(orig.toLowerCase(), orig);
+});
+
+const batchSize = 20; // Dexscreener supports multiple tokens per request; keep it modest
+const addrChunks: string[][] = [];
+for (let i = 0; i < whitelistedAddresses.length; i += batchSize) {
+  addrChunks.push(whitelistedAddresses.slice(i, i + batchSize));
+}
+
+let updated = 0;
+
+for (const chunk of addrChunks) {
+  const path = chunk.join(',');
+  const url = `https://api.dexscreener.com/tokens/v1/base/${path}`;
+  const resp = await fetch(url, { headers: { accept: 'application/json' } });
+  if (!resp.ok) {
+    continue;
+  }
+  const arr = await resp.json();
+  const chunkSet = new Set(chunk.map(a => a.toLowerCase()));
+
+  // Aggregate per-token totals from 24h window
+  const agg: Record<string, { count: number; volume: number }> = {};
+  const ensure = (addr: string) => (agg[addr] ||= { count: 0, volume: 0 });
+
+  for (const item of Array.isArray(arr) ? arr : []) {
+    const vol24 = Number(item?.volume?.h24 ?? 0) || 0;
+    const buys24 = Number(item?.txns?.h24?.buys ?? 0) || 0;
+    const sells24 = Number(item?.txns?.h24?.sells ?? 0) || 0;
+    const cnt = buys24 + sells24;
+
+    const addrs = [
+      String(item?.baseToken?.address || '').toLowerCase(),
+      String(item?.quoteToken?.address || '').toLowerCase(),
+    ];
+
+    for (const tok of addrs) {
+      if (!tok || !chunkSet.has(tok)) continue;
+      const slot = ensure(tok);
+      slot.count += cnt;
+      slot.volume += Math.abs(vol24);
+    }
+  }
+
+  const entries = Object.entries(agg); // [tokenLc, {count, volume}]
+
+  // Case-insensitive updates; insert lowercase for new
+  const updates = entries
+    .map(([lc, v]) => {
+      const orig = existingTokenMap.get(lc);
+      return orig ? { orig, ...v } : null;
+    })
+    .filter(Boolean) as Array<{ orig: string; count: number; volume: number }>;
+
+  const inserts = entries
+    .filter(([lc]) => !existingTokenMap.has(lc))
+    .map(([lc, v]) => ({
+      token_address: lc,                // insert lowercase
+      total_swaps: v.count,            // 24h buys + sells
+      total_volume: v.volume,          // 24h volume.usd
+      last_update: new Date().toISOString(),
+    }));
+
+  if (updates.length > 0) {
+    await Promise.all(
+      updates.map(u =>
+        supabase
+          .from('whitelisted_tokens')
+          .update({
+            total_swaps: u.count,
+            total_volume: u.volume,
+            last_update: new Date().toISOString(),
+          })
+          .eq('token_address', u.orig)
+      )
+    );
+  }
+
+  if (inserts.length > 0) {
+    const { error: insertErr } = await supabase.from('whitelisted_tokens').insert(inserts);
+    if (insertErr) {
+      tokenSwapTotalsUpdate = { success: false, updated, error: insertErr.message };
+      break;
+    }
+    // track these as existing going forward to avoid re-inserts
+    for (const r of inserts) existingTokenMap.set(r.token_address, r.token_address);
+  }
+
+  updated += entries.length;
+}
+
+if (tokenSwapTotalsUpdate.success) {
+  tokenSwapTotalsUpdate = { success: true, updated };
+}
+} catch (e: any) {
+  tokenSwapTotalsUpdate = { success: false, updated: 0, error: e?.message ?? 'Unknown error' };
+}
+
     // Compute consolidated metrics for wallets_status
     const totalSwapVolume = (() => {
       const swaps = data.swaps;
@@ -404,6 +508,7 @@ export async function POST(request: Request) {
       dbFid,
       walletTokenStatus,
       heldWhitelistedTokens,
+      tokenSwapTotalsUpdate,
       timestamp: new Date().toISOString(),
     });
 
