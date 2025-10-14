@@ -77,9 +77,10 @@ export default function Home() {
 
     // Calculate swap metrics
     const swapResults = swaps?.result || [];
-    const totalSwapVolume = swapResults.reduce((sum: number, swap: any) => sum + (parseFloat(swap.totalValueUsd) || 0), 0);
+    const totalSwapVolume = Number(results.walletsStatus?.total_volume ?? 0);
     const buySwaps = swapResults.filter((swap: any) => swap.transactionType === 'buy').length;
     const sellSwaps = swapResults.filter((swap: any) => swap.transactionType === 'sell').length;
+    console.log('totalSwapVolume', totalSwapVolume);
 
     // Calculate transfer metrics
     const transferResults = transfers?.result || [];

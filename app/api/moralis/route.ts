@@ -100,7 +100,6 @@ export async function POST(request: Request) {
       data: parsed[idx],
       size: JSON.stringify(parsed[idx]).length
     }));
-    console.log('responses', responses[1].data);
 
     // Build data object keyed by requested endpoints
     const data: Record<string, any> = {};
@@ -319,9 +318,6 @@ if (tokenSwapTotalsUpdate.success) {
     const totalVolume = totalTradeVolumeFromProfitability > 0
       ? totalTradeVolumeFromProfitability
       : totalSwapVolume;
-
-    console.log('totalVolume', totalVolume);
-
     const totalActivity = (() => {
       // Prefer counting unique swaps (each swap is a single tx)
       const swapsArr = Array.isArray(data?.swaps?.result) ? data.swaps.result : [];
@@ -369,54 +365,72 @@ if (tokenSwapTotalsUpdate.success) {
         return map;
       })();
 
-      // Group transfer counts per token (count only)
-      const transferArr = includeSet.has('transfers') && Array.isArray(data?.transfers?.result)
-        ? data.transfers.result
-        : [];
+            // Build per-token counts and USD volume from ALL swap pages
+      const wlSet = new Set(whitelistedAddresses);
       const transferCountsByToken: Record<string, number> = {};
-      const seenTransferKeys = new Set<string>();
-      for (const t of transferArr) {
-        const tokenAddr: string = (t?.address || t?.token_address || '').toLowerCase();
-        const txHash: string = String(t?.transaction_hash || t?.transactionHash || '');
-        if (!tokenAddr || !txHash) continue;
-        const key = `${tokenAddr}:${txHash}`;
-        if (seenTransferKeys.has(key)) continue; // dedupe multiple events for same token in one tx
-        seenTransferKeys.add(key);
-        transferCountsByToken[tokenAddr] = (transferCountsByToken[tokenAddr] || 0) + 1;
-      }
-
-      // Group USD volume per token by summing BOTH buy and sell usdAmount for whitelisted tokens
-      const swapsArr = includeSet.has('swaps') && Array.isArray(data?.swaps?.result)
-        ? data.swaps.result
-        : [];
-      const whitelistSet = new Set(whitelistedAddresses);
       const usdVolumeByToken: Record<string, number> = {};
-      for (const s of swapsArr) {
-        const normalize = (v: any) => String(v || '').toLowerCase();
-        const getTokenAddress = (side: any) => normalize(
-          side?.address || side?.token?.address || side?.token_address || side?.contractAddress || side?.contract_address
-        );
-        const toUsd = (v: any) => {
-          const n = typeof v === 'string' ? parseFloat(v) : Number(v);
-          return Number.isFinite(n) ? Math.abs(n) : 0;
-        };
-        const getUsd = (side: any) => toUsd(
-          side?.usdAmount ?? side?.usd_value ?? side?.valueUsd ?? side?.value_usd ?? 0
-        );
+      const seenKeys = new Set<string>();
 
-        const boughtSide = s?.bought || s?.buy || s?.tokenIn;
-        const soldSide = s?.sold || s?.sell || s?.tokenOut;
-        const boughtAddr = getTokenAddress(boughtSide);
-        const soldAddr = getTokenAddress(soldSide);
-        const boughtUsd = getUsd(boughtSide);
-        const soldUsd = getUsd(soldSide);
-        if (boughtAddr && whitelistSet.has(boughtAddr)) {
-          usdVolumeByToken[boughtAddr] = (usdVolumeByToken[boughtAddr] || 0) + boughtUsd;
+      const norm = (v: any) => String(v || '').toLowerCase();
+      const getAddr = (side: any) =>
+        norm(side?.address || side?.token?.address || side?.token_address || side?.contractAddress || side?.contract_address);
+      const toUsd = (v: any) => {
+        const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+        return Number.isFinite(n) ? Math.abs(n) : 0;
+      };
+      const getUsd = (side: any) => toUsd(side?.usdAmount ?? side?.usd_value ?? side?.valueUsd ?? side?.value_usd ?? 0);
+
+      const processSwaps = (arr: any[]) => {
+        for (const s of arr) {
+          const txHash = String(s?.transactionHash || s?.hash || '');
+          const boughtSide = s?.bought || s?.buy || s?.tokenIn;
+          const soldSide  = s?.sold  || s?.sell || s?.tokenOut;
+          const boughtAddr = getAddr(boughtSide);
+          const soldAddr  = getAddr(soldSide);
+          const boughtUsd = getUsd(boughtSide);
+          const soldUsd   = getUsd(soldSide);
+
+          for (const addr of [boughtAddr, soldAddr]) {
+            if (!addr || !txHash || !wlSet.has(addr)) continue;
+            const key = `${addr}:${txHash}`;
+            if (seenKeys.has(key)) continue;
+            seenKeys.add(key);
+            transferCountsByToken[addr] = (transferCountsByToken[addr] || 0) + 1;
+          }
+
+          if (boughtAddr && wlSet.has(boughtAddr)) {
+            usdVolumeByToken[boughtAddr] = (usdVolumeByToken[boughtAddr] || 0) + boughtUsd;
+          }
+          if (soldAddr && wlSet.has(soldAddr)) {
+            usdVolumeByToken[soldAddr] = (usdVolumeByToken[soldAddr] || 0) + soldUsd;
+          }
         }
-        if (soldAddr && whitelistSet.has(soldAddr)) {
-          usdVolumeByToken[soldAddr] = (usdVolumeByToken[soldAddr] || 0) + soldUsd;
-        }
+      };
+
+      // first page
+      processSwaps(Array.isArray(data?.swaps?.result) ? data.swaps.result : []);
+
+      // paginate up to 5 pages total (100 per page → max 500 swaps)
+      let cursor: string | null = (data?.swaps?.cursor as string) || null;
+      let pages = 1; // first page already processed
+
+      while (cursor && pages < 5) {
+        const url = new URL(`${baseUrl}/wallets/${walletAddress}/swaps`);
+        url.searchParams.set('chain', 'base');
+        url.searchParams.set('order', 'DESC');
+        url.searchParams.set('limit', '100');
+        url.searchParams.set('cursor', cursor);
+
+        const resp = await fetch(url.toString(), { headers });
+        if (!resp.ok) break;
+
+        const page = await resp.json();
+        processSwaps(Array.isArray(page?.result) ? page.result : []);
+        cursor = (page?.cursor as string) || null;
+        pages += 1;
       }
+      console.log('transferCountsByToken', transferCountsByToken);
+      console.log('usdVolumeByToken', usdVolumeByToken);
 
       const tokenAddresses = Array.from(new Set([
         ...Object.keys(transferCountsByToken),
