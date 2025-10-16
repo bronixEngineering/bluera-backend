@@ -21,10 +21,31 @@ export default function Home() {
     { transfers: true, swaps: true, netWorth: true, profitability: true }
   );
   const [fidInput, setFidInput] = useState('');
+  const [dexLoading, setDexLoading] = useState(false);
+  const [dexResults, setDexResults] = useState<any>(null);
 
   const getIncludeArray = () => Object.entries(include)
     .filter(([_, v]) => v)
     .map(([k]) => k);
+
+
+    const runDexscreener = async () => {
+      setDexLoading(true);
+      setDexResults(null);
+      try {
+        const resp = await fetch('/api/dexscreenr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chain: 'base', batchSize: 20 }),
+        });
+        const data = await resp.json();
+        setDexResults(data);
+      } catch (e: any) {
+        setDexResults({ success: false, error: e?.message || 'Request failed' });
+      } finally {
+        setDexLoading(false);
+      }
+    };
 
   const runTest = async () => {
     setLoading(true);
@@ -438,13 +459,29 @@ export default function Home() {
             </div>
           )}
 
-          <button 
-            onClick={runTest}
-            disabled={loading || getIncludeArray().length === 0}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
-          >
-            {loading ? 'Testing...' : 'Run Comprehensive Test'}
-          </button>
+            <div className="flex flex-wrap gap-3">
+              <button 
+                onClick={runTest}
+                disabled={loading || getIncludeArray().length === 0}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {loading ? 'Testing...' : 'Run Comprehensive Test'}
+              </button>
+
+              <button
+                onClick={runDexscreener}
+                disabled={dexLoading}
+                className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400"
+              >
+                {dexLoading ? 'Refreshing Dexscreener…' : 'Refresh Dexscreener (Whitelist)'}
+              </button>
+
+              {dexResults && (
+                <span className={`text-sm px-2 py-1 rounded ${dexResults.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {dexResults.success ? `Updated: ${dexResults.updated ?? 0}` : (dexResults.error || 'Error')}
+                </span>
+              )}
+            </div>
         </div>
 
         {results && results.success && renderSummary()}
