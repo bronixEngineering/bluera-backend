@@ -32,6 +32,22 @@ async function getProfitUsd(days: number, baseUrl: string, headers: Record<strin
   return Number.isFinite(n) ? n : 0;
 }
 
+async function getNetWorthUsd(baseUrl: string, headers: Record<string, string>, walletAddress: string, chain: string) {
+  const url = new URL(`${baseUrl}/wallets/${walletAddress}/net-worth`);
+  url.searchParams.append('chains[]', chain);
+  const resp = await fetch(url.toString(), { headers });
+  if (!resp.ok) return 0;
+  const json = await resp.json().catch(() => ({}));
+  const total = json?.total_networth_usd ?? 0;
+  const totalNum = typeof total === 'string' ? parseFloat(total) : Number(total);
+  if (Number.isFinite(totalNum) && totalNum > 0) return totalNum;
+  const chains = Array.isArray(json?.chains) ? json.chains : [];
+  return chains.reduce((acc: number, c: any) => {
+    const v = typeof c?.networth_usd === 'string' ? parseFloat(c.networth_usd) : Number(c?.networth_usd ?? 0);
+    return acc + (Number.isFinite(v) ? v : 0);
+  }, 0);
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -145,6 +161,7 @@ export async function POST(request: Request) {
     const volume_monthly = Array.from(buckets.month.values()).reduce((a, b) => a + b, 0);
     const weekly_pnl = await getProfitUsd(7, baseUrl, headers, walletAddress, chain);
     const monthly_pnl = await getProfitUsd(30, baseUrl, headers, walletAddress, chain);
+    const net_worth = await getNetWorthUsd(baseUrl, headers, walletAddress, chain);
     const dbWallet = walletAddress.toLowerCase();
 
     const updateFields: any = {
@@ -152,7 +169,8 @@ export async function POST(request: Request) {
       volume_weekly,
       volume_monthly,
       weekly_pnl,
-      monthly_pnl,
+      monthly_pnl, 
+      net_worth,
     };
     if (fid) updateFields.fid = fid;
     
