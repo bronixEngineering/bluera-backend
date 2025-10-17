@@ -174,12 +174,16 @@ export async function POST(request: Request) {
     };
     if (fid) updateFields.fid = fid;
     
+    // in app/api/moralis/route.ts, replace the update block with:
     const { error: upErr } = await supabase
       .from('wallets_status')
-      .update(updateFields)
-      .eq('wallet_address', dbWallet);
-    
+      .upsert(
+        { wallet_address: dbWallet, ...updateFields },
+        { onConflict: 'wallet_address' } // requires a unique/PK on wallet_address
+      );
+
     const db = upErr ? { success: false, error: upErr.message } : { success: true, error: null };
+        
     return NextResponse.json({
       success: true,
       wallet: walletAddress,
