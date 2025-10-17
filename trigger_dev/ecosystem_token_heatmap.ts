@@ -1,9 +1,9 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 
 type Payload = {
-  chain?: string;       // default: "base"
-  batchSize?: number;   // default: 20
-  baseUrl?: string;     // default: http://localhost:3000
+  chain?: string;       
+  batchSize?: number;   
+  baseUrl?: string;     
 };
 
 export const dexscreenrRefresh = task({
