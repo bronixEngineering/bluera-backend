@@ -2,13 +2,6 @@
 
 import { useState } from 'react';
 
-const TEST_WALLETS = [
-  { fid: '569188', address: '0x9f25aef6871710d2b7f4717775c63764589f3e61' },
-  { fid: '912281', address: '0x51a416e0ef70390720b08520a1ae58d4a7f4b90b' },
-  { fid: '314665', address: '0x560c47ebf69791b0695cadf341de3663ff946ef6' },
-  { fid: '808836', address: '0x9450089008dd3a9c76a88dd7aad85b61217c24bb' },
-  { fid: '314392', address: '0x13ba90fc651faef556887139b6b1c6d7150d91cf' },
-];
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -23,6 +16,33 @@ export default function Home() {
   const [fidInput, setFidInput] = useState('');
   const [dexLoading, setDexLoading] = useState(false);
   const [dexResults, setDexResults] = useState<any>(null);
+  const [wtsLoading, setWtsLoading] = useState(false);
+  const [wtsResult, setWtsResult] = useState<any>(null);
+
+  const runWalletTokenStatus = async () => {
+    setWtsLoading(true);
+    setWtsResult(null);
+    try {
+      const body = {
+        walletAddress: customWallet,
+        chain: 'base',
+        hours: 24,
+        maxPages: 3,
+      };
+      const resp = await fetch('/api/wallet-token-status-moralis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      setWtsResult(data);
+    } catch (e: any) {
+      setWtsResult({ success: false, error: e?.message || 'Request failed' });
+    } finally {
+      setWtsLoading(false);
+    }
+  };
+
 
   const getIncludeArray = () => Object.entries(include)
     .filter(([_, v]) => v)
@@ -475,6 +495,21 @@ export default function Home() {
               >
                 {dexLoading ? 'Refreshing Dexscreener…' : 'Refresh Dexscreener (Whitelist)'}
               </button>
+              <button
+                    onClick={runWalletTokenStatus}
+                    disabled={wtsLoading || !customWallet}
+                    className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 disabled:bg-gray-400"
+                  >
+                    {wtsLoading ? 'Running Wallet-Token Status…' : 'Run Wallet-Token Status'}
+                  </button>
+
+                  {wtsResult && (
+                    <span className={`text-sm px-2 py-1 rounded ${wtsResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {wtsResult.success
+                        ? `Updated: ${wtsResult.updated ?? 0} / ${wtsResult.processed ?? 0}`
+                        : (wtsResult.error || 'Error')}
+                    </span>
+                  )}
 
               {dexResults && (
                 <span className={`text-sm px-2 py-1 rounded ${dexResults.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
