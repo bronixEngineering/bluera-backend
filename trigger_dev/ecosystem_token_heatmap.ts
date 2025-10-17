@@ -15,8 +15,8 @@ export const dexscreenrRefresh = task({
     const baseUrl = String(payload.baseUrl || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000");
     const headers = { "Content-Type": "application/json" as const };
 
-    logger.log("Calling /api/dexscreenr", { chain, batchSize, baseUrl });
-
+    logger.log("Calling /api/dexscreenr (will also update total_volume_changing_rate)", { chain, batchSize, baseUrl });
+    
     const resp = await fetch(`${baseUrl}/api/dexscreenr`, {
       method: "POST",
       headers,
