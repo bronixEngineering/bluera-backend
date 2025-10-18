@@ -186,10 +186,7 @@ export async function POST(request: Request) {
       }
 
       const holdingUsd = holdingUsdMap.get(token) ?? 0;
-      console.log("holdingUsd", holdingUsd);
       const updateFields = { token_transfer_count: count, token_volume: volume, holding_amount_usd: holdingUsd };
-      console.log("updateFields", updateFields);
-      // Update
       const { data: upd, error: upErr } = await supabase
         .from('wallet_token_status')
         .update(updateFields)
