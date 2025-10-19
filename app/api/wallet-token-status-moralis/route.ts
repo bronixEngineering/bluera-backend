@@ -23,27 +23,17 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const walletAddress = String(body?.walletAddress || '').trim();
-    const chain = String(body?.chain || 'base');
+    const chain = 'base';
     const hours = Number.isFinite(body?.hours) ? Math.max(1, Math.min(168, Number(body.hours))) : 24;
-    const maxPages = Number.isFinite(body?.maxPages) ? Math.max(1, Math.min(10, Number(body.maxPages))) : 5;
-    const debugEnabled = !!body?.debug;
-    const debugToken = body?.debugToken ? String(body.debugToken).toLowerCase() : null;
-
-    const debug: any = { input: { walletAddress, chain, hours, maxPages, debugToken }, steps: [], errors: [] };
-    const log = (...args: any[]) => { if (debugEnabled) console.log('[WTS]', ...args); };
-    const err = (...args: any[]) => { console.error('[WTS][ERR]', ...args); debug.errors.push(args.map(String).join(' ')); };
-
-    log('request-received', debug.input);
+    const maxPages = 10;
 
     if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-      err('invalid-walletAddress');
-      return NextResponse.json({ success: false, error: 'Invalid walletAddress', debug }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Invalid walletAddress' }, { status: 400 });
     }
 
     const apiKey = process.env.MORALIS_API_KEY;
     if (!apiKey) {
-      err('missing-MORALIS_API_KEY');
-      return NextResponse.json({ success: false, error: 'MORALIS_API_KEY not set', debug }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'MORALIS_API_KEY not set' }, { status: 500 });
     }
     const headers = { accept: 'application/json', 'X-API-Key': apiKey };
     const baseUrl = 'https://deep-index.moralis.io/api/v2.2';
@@ -53,8 +43,7 @@ export async function POST(request: Request) {
     try {
       supabase = getSupabaseServerClient();
     } catch (e: any) {
-      err('supabase-client-error', e?.message);
-      return NextResponse.json({ success: false, error: e?.message || 'supabase init failed', debug }, { status: 500 });
+      return NextResponse.json({ success: false, error: e?.message || 'supabase init failed' }, { status: 500 });
     }
 
     // 1) Whitelist
@@ -62,18 +51,15 @@ export async function POST(request: Request) {
       .from('whitelisted_tokens')
       .select('token_address');
     if (wlErr) {
-      err('whitelist-load-failed', wlErr.message);
-      return NextResponse.json({ success: false, error: `Failed to load whitelisted tokens: ${wlErr.message}`, debug }, { status: 500 });
+      return NextResponse.json({ success: false, error: `Failed to load whitelisted tokens: ${wlErr.message}` }, { status: 500 });
     }
 
     const tokenAddresses: string[] = (wl || [])
       .map((r: any) => String(r?.token_address || '').toLowerCase())
       .filter(Boolean);
 
-    log('whitelist-size', tokenAddresses.length);
-
     if (tokenAddresses.length === 0) {
-      return NextResponse.json({ success: true, updated: 0, message: 'No whitelisted tokens', debug });
+      return NextResponse.json({ success: true, updated: 0, message: 'No whitelisted tokens' });
     }
 
     const walletLc = walletAddress.toLowerCase();
@@ -92,7 +78,6 @@ export async function POST(request: Request) {
 
         const resp = await fetch(url.toString(), { headers });
         if (!resp.ok) {
-          err('holdings-fetch-not-ok', resp.status);
           break;
         }
 
@@ -108,9 +93,8 @@ export async function POST(request: Request) {
         pagesTokens += 1;
       } while (cursor && pagesTokens < 5);
     } catch (e: any) {
-      err('holdings-fetch-exception', e?.message);
+      // Continue on error
     }
-    log('holdings-collected', { uniqueTokens: holdingUsdMap.size, pagesTokens });
 
     // 3) Iterate whitelisted tokens
     const results: Array<{
@@ -125,8 +109,6 @@ export async function POST(request: Request) {
 
     let processed = 0;
     for (const token of tokenAddresses) {
-      // daraltma: sadece debugToken ise logla
-      const traceThis = debugEnabled && (!debugToken || debugToken === token);
 
       const swapsUrl = new URL(`${baseUrl}/wallets/${walletAddress}/swaps`);
       swapsUrl.searchParams.set('chain', chain);
@@ -147,11 +129,9 @@ export async function POST(request: Request) {
         try {
           resp = await fetch(pageUrl.toString(), { headers });
         } catch (e: any) {
-          if (traceThis) err('swaps-fetch-network', e?.message, { token });
           break;
         }
         if (!resp.ok) {
-          if (traceThis) err('swaps-fetch-not-ok', resp.status, { token });
           break;
         }
 
@@ -159,7 +139,6 @@ export async function POST(request: Request) {
         try {
           json = await resp.json();
         } catch (e: any) {
-          if (traceThis) err('swaps-json-parse', e?.message, { token });
           break;
         }
 
@@ -177,7 +156,6 @@ export async function POST(request: Request) {
         if (!cur) break;
       }
 
-      if (traceThis) log('token-aggregate', { token, count, volume });
 
       // API null/empty ise bu tokenı atla (yazma yok)
       if (count === 0) {
@@ -195,7 +173,6 @@ export async function POST(request: Request) {
         .select('id');
 
       if (upErr) {
-        if (traceThis) err('supabase-update-error', upErr.message, { token, walletLc });
         // Insert dene
         const { error: insErr } = await supabase.from('wallet_token_status').insert({
           wallet_address: walletLc,
@@ -203,10 +180,8 @@ export async function POST(request: Request) {
           ...updateFields,
         });
         if (insErr) {
-          if (traceThis) err('supabase-insert-error', insErr.message, { token, walletLc });
           results.push({ token, count, volume, holding_usd: holdingUsd, updated: false, upErr: upErr.message, insErr: insErr.message });
         } else {
-          if (traceThis) log('supabase-insert-ok', { token });
           results.push({ token, count, volume, holding_usd: holdingUsd, updated: true, upErr: upErr.message, insErr: null });
         }
       } else {
@@ -218,24 +193,19 @@ export async function POST(request: Request) {
             ...updateFields,
           });
           if (insErr) {
-            if (traceThis) err('supabase-insert-after-empty-update-error', insErr.message, { token, walletLc });
             results.push({ token, count, volume, holding_usd: holdingUsd, updated: false, insErr: insErr.message });
           } else {
-            if (traceThis) log('supabase-insert-after-empty-update-ok', { token });
             results.push({ token, count, volume, holding_usd: holdingUsd, updated: true });
           }
         } else {
-          if (traceThis) log('supabase-update-ok', { token, updatedRows: upd.length });
           results.push({ token, count, volume, holding_usd: holdingUsd, updated: true });
         }
       }
 
       processed += 1;
-      // Çok gürültüyse sadece ilk birkaç tokenı izlemek için break eklenebilir.
     }
 
     const updated = results.filter(r => r.updated).length;
-    log('done', { processed, updated });
 
     return NextResponse.json({
       success: true,
@@ -245,7 +215,6 @@ export async function POST(request: Request) {
       updated,
       processed: results.length,
       results,
-      debug: debugEnabled ? debug : undefined,
       timestamp: new Date().toISOString(),
     });
   } catch (e: any) {

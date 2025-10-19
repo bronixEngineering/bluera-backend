@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const walletAddress = String(body?.walletAddress || '').trim();
     const chain = String(body?.chain || 'base');
     const fid = body?.fid ? String(body.fid) : undefined; // optional, text
-    const maxPages = Number.isFinite(body?.maxPages) ? Math.max(1, Math.min(10, Number(body.maxPages))) : 10;
+    const maxPages = 100;
 
     if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
       return NextResponse.json({ success: false, error: 'Invalid walletAddress' }, { status: 400 });
