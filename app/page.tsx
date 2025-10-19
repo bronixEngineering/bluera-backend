@@ -43,7 +43,6 @@ export default function Home() {
     }
   };
 
-
   const getIncludeArray = () => Object.entries(include)
     .filter(([_, v]) => v)
     .map(([k]) => k);

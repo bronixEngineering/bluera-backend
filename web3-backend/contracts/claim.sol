@@ -57,6 +57,16 @@ contract BlueraClaimContract is Ownable, ReentrancyGuard {
         emit ClaimableUpdated(user, claimable[user], block.timestamp);
     }
 
+    function setClaimableBatch(address[] calldata users, uint256[] calldata amounts) external onlyOwner {
+        require(users.length == amounts.length, "Length mismatch");
+        for (uint256 i = 0; i < users.length; i++) {
+            require(users[i] != address(0), "Zero address");
+            require(amounts[i] > 0, "Amount must be > 0");
+            claimable[users[i]] += amounts[i];
+            emit ClaimableUpdated(users[i], claimable[users[i]], block.timestamp);
+        }
+    }
+
     /// @notice Owner can overwrite a user’s “claimable” balance directly
     /// @dev Only callable by the contract owner
     /// @param user The address whose balance will be set
