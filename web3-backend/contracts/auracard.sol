@@ -47,7 +47,7 @@ contract AuraCardNFTContract is
     // ---------- Pricing (cents) ----------
     uint256 public firstMintUsdCents;         // varsayılan 1
     uint256 public subsequentMintUsdCents;    // varsayılan 10
-    uint256 private constant CENT_TO_USDC_UNITS = 10_000; // 1 cent = 10_000 (6 dec token varsayımı)
+    uint256 private constant CENT_TO_USDC_UNITS = 10000; // 1 cent = 10_000 (6 dec token varsayımı)
 
     // ---------- First-time minter tracking ----------
     mapping(address => bool) public hasMinted;
@@ -58,7 +58,7 @@ contract AuraCardNFTContract is
     uint256 public maxPaginationLimit;
 
     // ---------- Token IDs ----------
-    uint256 public nextId; // 1'den başlar
+    uint256 public nextId; 
 
     // ---------- TokenData ----------
     struct TokenData {
@@ -129,10 +129,6 @@ contract AuraCardNFTContract is
 
         if (!hasMinted[msg.sender]) {
             hasMinted[msg.sender] = true;
-            if (!_isListedMinter[msg.sender]) {
-                _isListedMinter[msg.sender] = true;
-                _minters.push(msg.sender);
-            }
             emit Minted(msg.sender, tokenId, amount, true);
         } else {
             emit Minted(msg.sender, tokenId, amount, false);
@@ -162,17 +158,90 @@ contract AuraCardNFTContract is
         emit PaymentTokenUpdated(newToken);
     }
 
-    function setPaginationLimit(uint256 newLimit) external onlyOwner {
-        require(newLimit > 0, "limit=0");
-        maxPaginationLimit = newLimit;
-        emit PaginationLimitUpdated(newLimit);
-    }
+
 
     function setTokenURI(uint256 tokenId, string memory uri) public onlyOwner {
         require(_ownerOf(tokenId) != address(0), "URI set for nonexistent token");
         _setTokenURI(tokenId, uri);
         emit URIUpdated(tokenId, uri);
     }
+
+    // -------------------- pagination & batches --------------------
+
+    function setPaginationLimit(uint256 newLimit) external onlyOwner {
+        require(newLimit > 0, "limit=0");
+        maxPaginationLimit = newLimit;
+        emit PaginationLimitUpdated(newLimit);
+    }
+
+    function getTokenDataPaginated(uint256 startId, uint256 limit)
+        external
+        view
+        returns (uint256[] memory tokenIds, TokenData[] memory data, uint256 lastId)
+    {
+        require(limit > 0 && limit <= maxPaginationLimit, "bad limit");
+
+        uint256 supplyLast = (nextId == 0) ? 0 : (nextId - 1);
+        lastId = supplyLast; 
+
+        uint256 endId = startId + limit - 1;
+        if (endId > supplyLast) endId = supplyLast;
+
+        uint256 outLen = endId - startId + 1;
+        tokenIds = new uint256[](outLen);
+        data     = new TokenData[](outLen);
+
+        for (uint256 i = 0; i < outLen; ) {
+            uint256 tokenId = startId + i;
+            // Burn fonksiyonu yok ama yine de güvenlik amaçlı kontrol:
+            require(_ownerOf(tokenId) != address(0), "nonexistent tokenId");
+
+            tokenIds[i] = tokenId;
+
+            TokenData storage d = _tokenData[tokenId];
+            data[i] = TokenData({
+                network:       d.network,
+                holderTag:     d.holderTag,
+                allTimeVolume: d.allTimeVolume,
+                allTimePnl:    d.allTimePnl,
+                walletAge:     d.walletAge,
+                dateInterval:  d.dateInterval
+            });
+
+            unchecked { ++i; }
+        }
+    }
+
+    function getTokenDataBatchByIds(uint256[] calldata tokenIds)
+        external
+        view
+        returns (TokenData[] memory data)
+    {
+        uint256 n = tokenIds.length;
+        require(n > 0 && n <= maxPaginationLimit, "bad length");
+
+        data = new TokenData[](n);
+        for (uint256 i = 0; i < n; ) {
+            uint256 tokenId = tokenIds[i];
+            require(_ownerOf(tokenId) != address(0), "nonexistent tokenId");
+            TokenData storage d = _tokenData[tokenId];
+
+            // storage -> memory kopya
+            data[i] = TokenData({
+                network:       d.network,
+                holderTag:     d.holderTag,
+                allTimeVolume: d.allTimeVolume,
+                allTimePnl:    d.allTimePnl,
+                walletAge:     d.walletAge,
+                dateInterval:  d.dateInterval
+            });
+
+            unchecked { ++i; }
+        }
+    }
+
+
+
 
     // -------------------- TokenData (store on-chain) --------------------
     function setTokenData(
