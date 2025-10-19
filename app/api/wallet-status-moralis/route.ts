@@ -32,6 +32,16 @@ async function getProfitUsd(days: number, baseUrl: string, headers: Record<strin
   return Number.isFinite(n) ? n : 0;
 }
 
+async function getAllTimeTradeVolumeUsd(baseUrl: string, headers: Record<string, string>, walletAddress: string, chain: string) {
+  const url = `${baseUrl}/wallets/${walletAddress}/profitability/summary?chain=${chain}`;
+  const resp = await fetch(url, { headers });
+  if (!resp.ok) return 0;
+  const json = await resp.json().catch(() => ({}));
+  const v = json?.total_trade_volume ?? 0;
+  const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+  return Number.isFinite(n) ? Math.abs(n) : 0;
+}
+
 async function getNetWorthUsd(baseUrl: string, headers: Record<string, string>, walletAddress: string, chain: string) {
   const url = new URL(`${baseUrl}/wallets/${walletAddress}/net-worth`);
   url.searchParams.append('chains[]', chain);
@@ -64,9 +74,9 @@ export async function POST(request: Request) {
     if (!apiKey) {
       return NextResponse.json({ success: false, error: 'MORALIS_API_KEY not set' }, { status: 500 });
     }
+    
     const headers = { 'X-API-Key': apiKey, accept: 'application/json' };
     const baseUrl = 'https://deep-index.moralis.io/api/v2.2';
-
     const supabase = getSupabaseServerClient();
 
     // Load tokens to filter one-by-one
@@ -162,6 +172,7 @@ export async function POST(request: Request) {
     const weekly_pnl = await getProfitUsd(7, baseUrl, headers, walletAddress, chain);
     const monthly_pnl = await getProfitUsd(30, baseUrl, headers, walletAddress, chain);
     const net_worth = await getNetWorthUsd(baseUrl, headers, walletAddress, chain);
+    const all_time_volume = await getAllTimeTradeVolumeUsd(baseUrl, headers, walletAddress, chain);
     const dbWallet = walletAddress.toLowerCase();
 
     const updateFields: any = {
@@ -171,15 +182,15 @@ export async function POST(request: Request) {
       weekly_pnl,
       monthly_pnl, 
       net_worth,
+      all_time_volume,
     };
     if (fid) updateFields.fid = fid;
     
-    // in app/api/moralis/route.ts, replace the update block with:
     const { error: upErr } = await supabase
       .from('wallets_status')
       .upsert(
         { wallet_address: dbWallet, ...updateFields },
-        { onConflict: 'wallet_address' } // requires a unique/PK on wallet_address
+        { onConflict: 'wallet_address' }
       );
 
     const db = upErr ? { success: false, error: upErr.message } : { success: true, error: null };
@@ -196,6 +207,7 @@ export async function POST(request: Request) {
       volume_daily,
       volume_weekly,
       volume_monthly,
+      all_time_volume,
       db,
       timestamp: new Date().toISOString(),
     });

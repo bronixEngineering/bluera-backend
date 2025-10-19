@@ -78,7 +78,7 @@ export default function Home() {
     const fid = fidInput && !isNaN(Number(fidInput)) ? Number(fidInput) : undefined;
 
     try {
-      const response = await fetch('/api/moralis', {
+      const response = await fetch('/api/wallet-status-moralis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: walletToTest, include: includeArr, fid }),
