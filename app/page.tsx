@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 
-
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);

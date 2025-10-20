@@ -3,7 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { chain = 'base', batchSize = 20, debugAddress } = await request.json().catch(() => ({}));
+    const { chain = 'base', batchSize = 1000, debugAddress } = await request.json().catch(() => ({}));
     const debugLc = typeof debugAddress === 'string' && debugAddress ? String(debugAddress).toLowerCase() : null;
     const debugInfo: any = debugLc
       ? { token: debugLc, inWhitelist: false, prevVolume: null, chunks: [], aggregatedVolume: 0, updatePath: null, computedRate: null }
@@ -48,11 +48,6 @@ export async function POST(request: Request) {
       debugInfo.inWhitelist = existingTokenMap.has(debugLc!);
       debugInfo.prevVolume = existingVolumeMap.has(debugLc!) ? existingVolumeMap.get(debugLc!) : null;
       // eslint-disable-next-line no-console
-      console.log('[dexscreenr][debug] token:', debugInfo.token, {
-        inWhitelist: debugInfo.inWhitelist,
-        prevVolume: debugInfo.prevVolume,
-        whitelistSize: whitelistRows?.length ?? 0,
-      });
     }
 
     if (whitelistedAddresses.length === 0) {
@@ -84,7 +79,7 @@ export async function POST(request: Request) {
       const chunkSet = new Set(chunk.map(a => a.toLowerCase()));
       
       // Aggregate per-token (24h)
-      type Agg = { count: number; volume: number; image_url?: string };
+      type Agg = { count: number; volume: number; image_url?: string; };
       const agg: Record<string, Agg> = {};
       const ensure = (addr: string) => (agg[addr] ||= { count: 0, volume: 0 });
 
