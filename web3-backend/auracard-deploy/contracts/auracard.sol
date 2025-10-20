@@ -103,7 +103,7 @@ contract AuraCardNFTContract is
         paymentToken     = IERC20(paymentTokenAddress_);
         paymentCollector = paymentCollector_;
 
-        firstMintUsdCents      = 1;
+        firstMintUsdCents      = 0;
         subsequentMintUsdCents = 10;
         nextId                 = 1;
 
