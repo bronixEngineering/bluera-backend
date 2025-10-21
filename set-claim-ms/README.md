@@ -39,6 +39,26 @@ npm start
 
 ## API Endpoints
 
+### GET /health
+
+Health check endpoint for monitoring service status. No authentication required.
+
+**Response**:
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-10-21T18:10:50.351Z",
+  "uptime": 123.456
+}
+```
+
+**Example with curl**:
+```bash
+curl -X GET http://localhost:3000/health
+```
+
+---
+
 ### GET /api/hello-world
 
 Returns a Hello World JSON response.
@@ -134,12 +154,14 @@ curl -X POST http://localhost:3000/api/set-claimable \
 src/
 ├── controllers/       # Request handlers
 │   ├── helloController.ts
+│   ├── healthController.ts
 │   └── setClaimableController.ts
 ├── middleware/        # Express middleware
 │   ├── authMiddleware.ts
 │   └── errorHandler.ts
 ├── routes/           # API routes
 │   ├── helloRoutes.ts
+│   ├── healthRoutes.ts
 │   └── setClaimableRoutes.ts
 ├── supabase/         # Database connection
 │   └── index.ts
@@ -173,6 +195,50 @@ src/
 - ✅ Web3 blockchain integration
 - ✅ Supabase database integration
 - ✅ Singleton pattern for utility classes
+
+## Deployment to Railway
+
+This project includes a `railway.toml` configuration file for easy deployment to Railway.
+
+### Deploy Steps
+
+1. **Push your code to GitHub**
+2. **Connect to Railway**:
+   - Go to [Railway](https://railway.app/)
+   - Create a new project
+   - Connect your GitHub repository
+
+3. **Set Environment Variables** in Railway dashboard:
+   ```
+   PORT=3000
+   API_KEY=your-secure-api-key
+   SUPABASE_URL=your-supabase-url
+   SUPABASE_KEY=your-supabase-key
+   RPC_URL=your-blockchain-rpc-url
+   PRIVATE_KEY=your-private-key
+   CLAIM_CONTRACT_ADDRESS=your-contract-address
+   ```
+
+4. **Deploy**: Railway will automatically detect the `railway.toml` and deploy your application
+
+### Railway Configuration
+
+The `railway.toml` file configures:
+- **Builder**: Nixpacks (automatic detection)
+- **Build Command**: `npm run build` (compiles TypeScript)
+- **Start Command**: `npm start` (runs compiled TypeScript from `dist/`)
+- **Restart Policy**: Restarts on failure (max 3 retries)
+- **Environment**: Production with NODE_ENV and PORT settings
+- **Health Check**: Monitors `/health` endpoint every 60 seconds
+
+### Post-Deployment
+
+After deployment, configure your Supabase webhook:
+1. Go to your Supabase project → Database → Webhooks
+2. Create a new webhook for the `claimable_addresses` table
+3. Set the webhook URL to: `https://your-railway-app.railway.app/api/set-claimable`
+4. Add header: `x-api-key: your-api-key`
+5. Set trigger to: INSERT events
 
 ## Extending the API
 

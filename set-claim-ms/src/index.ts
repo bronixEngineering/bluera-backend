@@ -1,6 +1,7 @@
 import express from "express";
 import helloRoutes from "./routes/helloRoutes";
 import setClaimableRoutes from "./routes/setClaimableRoutes";
+import healthRoutes from "./routes/healthRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 // Initialize express app
@@ -11,6 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // Routes
+app.use(healthRoutes); // Health check - no /api prefix
 app.use("/api", helloRoutes);
 app.use("/api", setClaimableRoutes);
 

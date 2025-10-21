@@ -1,0 +1,29 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[environments.production]
+# Environment variables will be set in Railway dashboard
+# Required variables:
+# - API_KEY
+# - SUPABASE_URL
+# - SUPABASE_KEY
+# - RPC_URL
+# - PRIVATE_KEY
+# - CLAIM_CONTRACT_ADDRESS
+
+[environments.production.variables]
+NODE_ENV = "production"
+PORT = "3000"
+
+# Health check configuration
+[environments.production.healthcheck]
+path = "/health"
+timeout = 30
+interval = 60
+
