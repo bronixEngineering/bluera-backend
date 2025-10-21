@@ -227,7 +227,7 @@ CREATE TABLE public.claimable_addresses (
 - **File**: `web3-backend/contracts/AuraCard.sol`
 - **ABI**: `web3-backend/ABI/auracardABI.json` (empty - needs generation)
 - **Network**: Base
-- **Deployed Proxy Address**: `0x1e885b12D233dFDc677eCd0CC62A0bad5F69ebAc`
+- **Deployed Proxy Address**: `0x63d3E312A9B287D9103d88b674b3B3A36B14E8e2`
 
 #### Database Integration
 **Table**: `aura_card` (existing)

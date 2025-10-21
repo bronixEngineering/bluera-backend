@@ -17,6 +17,8 @@ export default function Home() {
   const [dexResults, setDexResults] = useState<any>(null);
   const [wtsLoading, setWtsLoading] = useState(false);
   const [wtsResult, setWtsResult] = useState<any>(null);
+  const [auraLoading, setAuraLoading] = useState(false);
+  const [auraResult, setAuraResult] = useState<any>(null);
 
   const runWalletTokenStatus = async () => {
     setWtsLoading(true);
@@ -64,6 +66,28 @@ export default function Home() {
         setDexLoading(false);
       }
     };
+
+  const runAuraCard = async () => {
+    setAuraLoading(true);
+    setAuraResult(null);
+    try {
+      const body = {
+        walletAddress: customWallet,
+        chain: 'base'
+      };
+      const resp = await fetch('/api/aura_card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      setAuraResult(data);
+    } catch (e: any) {
+      setAuraResult({ success: false, error: e?.message || 'Request failed' });
+    } finally {
+      setAuraLoading(false);
+    }
+  };
 
   const runTest = async () => {
     setLoading(true);
@@ -513,6 +537,23 @@ export default function Home() {
                 <span className={`text-sm px-2 py-1 rounded ${dexResults.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                   {dexResults.success ? `Updated: ${dexResults.updated ?? 0}` : (dexResults.error || 'Error')}
                 </span>
+              )}
+
+              <button 
+                onClick={runAuraCard} 
+                disabled={auraLoading || !customWallet}
+                className="bg-purple-500 text-white px-4 py-2 rounded disabled:opacity-50"
+              >
+                {auraLoading ? 'Loading...' : 'Run Aura Card'}
+              </button>
+
+              {auraResult && (
+                <div className="mt-4 p-4 border rounded">
+                  <h3 className="font-bold">Aura Card Result:</h3>
+                  <pre className="text-sm overflow-auto">
+                    {JSON.stringify(auraResult, null, 2)}
+                  </pre>
+                </div>
               )}
             </div>
         </div>
