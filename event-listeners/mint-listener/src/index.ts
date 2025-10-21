@@ -80,7 +80,7 @@ async function main() {
     const minterAddress = event.returnValues.minter;
     const tokenId = Number(event.returnValues.tokenId);
     const supabaseId = event.returnValues.supabase_uuid;
-    const blocknumber = event.blockNumber;
+    const blocknumber = Number(event.blockNumber);
 
     const updateResult = await supabaseUtils.updateAuraCard(supabaseId, tokenId);
     if (!updateResult.isSuccess) {
