@@ -174,7 +174,7 @@ src/
 
 ## Technologies
 
-- **Node.js** - JavaScript runtime
+- **Node.js 20+** - JavaScript runtime
 - **Express 5.1.0** - Web framework
 - **TypeScript 5.8.3** - Type safety
 - **ts-node** - TypeScript execution
