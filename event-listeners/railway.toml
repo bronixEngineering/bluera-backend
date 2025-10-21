@@ -1,10 +1,9 @@
 [build]
-builder = "nixpacks"
-buildCommand = "cd mint-listener && npm install && npm run build"
-watchPatterns = ["mint-listener/src/**"]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+rootDirectory = "mint-listener"
 
 [deploy]
-startCommand = "cd mint-listener && npm start"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
