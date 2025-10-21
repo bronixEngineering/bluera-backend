@@ -1,5 +1,6 @@
 import express from "express";
 import helloRoutes from "./routes/helloRoutes";
+import setClaimableRoutes from "./routes/setClaimableRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 // Initialize express app
@@ -11,6 +12,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api", helloRoutes);
+app.use("/api", setClaimableRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

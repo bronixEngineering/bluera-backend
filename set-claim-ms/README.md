@@ -17,6 +17,11 @@ Create a `.env` file in the project root:
 ```env
 PORT=3000
 API_KEY=your-api-key-here
+SUPABASE_URL=your-supabase-url
+SUPABASE_KEY=your-supabase-key
+RPC_URL=your-blockchain-rpc-url
+PRIVATE_KEY=your-private-key
+CLAIM_CONTRACT_ADDRESS=your-contract-address
 ```
 
 ### Run in Development Mode
@@ -58,18 +63,70 @@ curl -X GET http://localhost:3000/api/hello-world \
   -H "x-api-key: your-api-key-here"
 ```
 
+---
+
+### POST /api/set-claimable
+
+Sets claimable token amount for a wallet address on the blockchain.
+
+**Authentication**: Required (API Key)
+
+**Headers**:
+```
+x-api-key: your-api-key-here
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "wallet": "0x1234567890123456789012345678901234567890",
+  "amount": 15
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "isSuccess": true,
+  "message": "Claimable amount set successfully"
+}
+```
+
+**Response (Error)**:
+```json
+{
+  "isSuccess": false,
+  "message": "Error details..."
+}
+```
+
+**Example with curl**:
+```bash
+curl -X POST http://localhost:3000/api/set-claimable \
+  -H "x-api-key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"wallet": "0x1234567890123456789012345678901234567890", "amount": 15}'
+```
+
 ## Project Structure
 
 ```
 src/
 ├── controllers/       # Request handlers
-│   └── helloController.ts
+│   ├── helloController.ts
+│   └── setClaimableController.ts
 ├── middleware/        # Express middleware
 │   ├── authMiddleware.ts
 │   └── errorHandler.ts
 ├── routes/           # API routes
-│   └── helloRoutes.ts
-├── utils/            # Utility functions (empty, ready for expansion)
+│   ├── helloRoutes.ts
+│   └── setClaimableRoutes.ts
+├── supabase/         # Database connection
+│   └── index.ts
+├── utils/            # Utility functions
+│   ├── supabaseUtils.ts
+│   └── web3Utils.ts
 └── index.ts          # Application entry point
 ```
 
@@ -81,6 +138,8 @@ src/
 - **ts-node** - TypeScript execution
 - **nodemon** - Development hot-reloading
 - **dotenv** - Environment variable management
+- **Supabase** - PostgreSQL database
+- **Web3.js 4.16.0** - Blockchain interactions
 
 ## Architecture Features
 
@@ -91,6 +150,9 @@ src/
 - ✅ Environment-based configuration
 - ✅ Hot-reloading in development
 - ✅ Production build support
+- ✅ Web3 blockchain integration
+- ✅ Supabase database integration
+- ✅ Singleton pattern for utility classes
 
 ## Extending the API
 
