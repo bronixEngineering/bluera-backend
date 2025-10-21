@@ -67,7 +67,7 @@ curl -X GET http://localhost:3000/api/hello-world \
 
 ### POST /api/set-claimable
 
-Sets claimable token amount for a wallet address on the blockchain.
+Sets claimable token amount for a wallet address on the blockchain using the default amount. This endpoint is designed to handle Supabase database webhooks from the `claimable_addresses` table.
 
 **Authentication**: Required (API Key)
 
@@ -77,11 +77,18 @@ x-api-key: your-api-key-here
 Content-Type: application/json
 ```
 
-**Request Body**:
+**Request Body** (Supabase Webhook Format):
 ```json
 {
-  "wallet": "0x1234567890123456789012345678901234567890",
-  "amount": 15
+  "type": "INSERT",
+  "table": "claimable_addresses",
+  "schema": "public",
+  "record": {
+    "created_at": "2025-10-21T18:10:50.351557+00:00",
+    "wallet_address": "0x1234567890123456789012345678901234567890",
+    "claimable_right": null
+  },
+  "old_record": null
 }
 ```
 
@@ -106,8 +113,20 @@ Content-Type: application/json
 curl -X POST http://localhost:3000/api/set-claimable \
   -H "x-api-key: your-api-key-here" \
   -H "Content-Type: application/json" \
-  -d '{"wallet": "0x1234567890123456789012345678901234567890", "amount": 15}'
+  -d '{
+    "type": "INSERT",
+    "table": "claimable_addresses",
+    "schema": "public",
+    "record": {
+      "wallet_address": "0x1234567890123456789012345678901234567890"
+    }
+  }'
 ```
+
+**Note**: 
+- The endpoint extracts the wallet address from `record.wallet_address` in the webhook payload
+- The claimable amount is set to `DEFAULT_SET_CLAIMABLE_AMOUNT` constant (20000), which is defined in `src/utils/constants.ts`
+- This endpoint is designed to be triggered automatically by Supabase webhooks when new records are inserted into the `claimable_addresses` table
 
 ## Project Structure
 
@@ -125,6 +144,7 @@ src/
 ├── supabase/         # Database connection
 │   └── index.ts
 ├── utils/            # Utility functions
+│   ├── constants.ts
 │   ├── supabaseUtils.ts
 │   └── web3Utils.ts
 └── index.ts          # Application entry point

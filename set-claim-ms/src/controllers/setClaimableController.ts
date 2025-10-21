@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Web3Utils from "../utils/web3Utils";
 import SupabaseUtils from "../utils/supabaseUtils";
+import { DEFAULT_SET_CLAIMABLE_AMOUNT } from "../utils/constants";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -42,29 +43,28 @@ async function initializeWeb3Utils(): Promise<Web3Utils | null> {
 
 /**
  * POST /api/set-claimable
- * Sets claimable amount for a wallet address
+ * Sets claimable amount for a wallet address using the default amount
+ * Handles Supabase webhook payloads from claimable_addresses table
  * 
- * Request body: { wallet: string, amount: number }
+ * Request body: Supabase webhook payload with record.wallet_address
  */
 export const setClaimable = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { wallet, amount } = req.body;
+    const { type, table, record } = req.body;
 
-    // Validate request body
-    if (!wallet || amount === undefined) {
+    // Validate webhook payload structure
+    if (!record || !record.wallet_address) {
       res.status(400).json({ 
-        error: "Missing required fields: wallet and amount" 
+        error: "Missing required field: record.wallet_address" 
       });
       return;
     }
 
-    // Validate amount is a positive number
-    if (typeof amount !== "number" || amount <= 0) {
-      res.status(400).json({ 
-        error: "Amount must be a positive number" 
-      });
-      return;
-    }
+    // Extract wallet address from webhook payload
+    const walletAddress = record.wallet_address;
+
+    // Log webhook details for debugging
+    console.log(`Processing webhook: type=${type}, table=${table}, wallet=${walletAddress}`);
 
     // Initialize Web3Utils (cached after first call)
     const web3Utils = await initializeWeb3Utils();
@@ -76,8 +76,8 @@ export const setClaimable = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Call setClaimableAmount
-    const result = await web3Utils.setClaimableAmount(wallet, amount);
+    // Call setClaimableAmount with default amount
+    const result = await web3Utils.setClaimableAmount(walletAddress, DEFAULT_SET_CLAIMABLE_AMOUNT);
 
     // Return result as-is
     if (result.isSuccess) {
