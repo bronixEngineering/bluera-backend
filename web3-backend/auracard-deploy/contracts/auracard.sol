@@ -120,18 +120,20 @@ contract AuraCardNFTContract is
         uint256 cents  = hasMinted[msg.sender] ? subsequentMintUsdCents : firstMintUsdCents;
         uint256 amount = cents * CENT_TO_USDC_UNITS;
 
-        // Kullanıcı önceden approve etmiş olmalı
-        paymentToken.safeTransferFrom(msg.sender, paymentCollector, amount);
+        // Eğer amount > 0 ise transfer yap
+        if (amount > 0) {
+            paymentToken.safeTransferFrom(msg.sender, paymentCollector, amount);
+        }
 
         uint256 tokenId = nextId++;
         _safeMint(msg.sender, tokenId);
 
-        if (!hasMinted[msg.sender]) {
+        bool isFirstMint = !hasMinted[msg.sender];
+        if (isFirstMint) {
             hasMinted[msg.sender] = true;
-            emit Minted(msg.sender, tokenId, amount, true, _id);
-        } else {
-            emit Minted(msg.sender, tokenId, amount, false, _id);
         }
+
+        emit Minted(msg.sender, tokenId, amount, isFirstMint, _id);
     }
 
     // -------------------- Admin --------------------

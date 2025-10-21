@@ -9,9 +9,9 @@ describe('AuraCard mint (Base)', function () {
 
   it('approves USDC on USDC contract and calls mint(string) on proxy', async function () {
     // REQUIRED: .env -> PRIVATE_KEY must be configured in hardhat network accounts
-    const PROXY_ADDRESS = '0x033e7782F44EeDD498425126bf92e6D3e4aF9264'; // your proxy
+    const PROXY_ADDRESS = '0x63d3E312A9B287D9103d88b674b3B3A36B14E8e2'; // your proxy
     const USDC_ADDRESS  = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
-    const MEMO_ID       = 'supabase_row_uuid_or_any_string';
+    const MEMO_ID       = '415bcd46-b320-4f78-b349-77538e6929a6';
 
     const [signer] = await ethers.getSigners();
     const from = await signer.getAddress();
@@ -34,8 +34,7 @@ describe('AuraCard mint (Base)', function () {
     const aura = new ethers.Contract(PROXY_ADDRESS, auracardAbi, signer);
 
     // First mint price = 1 cent; contract uses 1 cent = 10_000 units (USDC 6 decimals)
-    const amount = 10_000_000n;
-
+    const amount = 0n; 
 
     console.log('Approving USDC to proxy...');
     const txA = await usdc.approve(PROXY_ADDRESS, amount);
