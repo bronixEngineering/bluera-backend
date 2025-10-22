@@ -184,7 +184,7 @@ npx trigger.dev@latest dev
 - **File**: `web3-backend/contracts/claim.sol`
 - **ABI**: `web3-backend/ABI/claimABI.json`
 - **Network**: Base
-- **Deployed Address**: `0xb1300cBc360c04c377C4b37FD9bA132b08969a60`
+- **Deployed Address**: `0x734FB924B7f3dd3Af627B4995186Fc44AC581b9d`
 
 #### Database Integration
 **Table**: `claimable_addresses`
@@ -227,7 +227,9 @@ CREATE TABLE public.claimable_addresses (
 - **File**: `web3-backend/contracts/AuraCard.sol`
 - **ABI**: `web3-backend/ABI/auracardABI.json` (empty - needs generation)
 - **Network**: Base
-- **Deployed Proxy Address**: `0x63d3E312A9B287D9103d88b674b3B3A36B14E8e2`
+- **Deployed Proxy Contract Address**: `0x0BDDf09e207B0303f3F5CA5Af69C9b2ECF74b453`
+- **Implementation Contract Address**: `0xBAb8380262e75AF98f36F3067Ab0d8722f7aada8`
+
 
 #### Database Integration
 **Table**: `aura_card` (existing)
