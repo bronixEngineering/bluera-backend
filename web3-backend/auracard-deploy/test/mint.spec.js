@@ -11,7 +11,7 @@ describe('AuraCard mint (Base)', function () {
     // REQUIRED: .env -> PRIVATE_KEY must be configured in hardhat network accounts
     const PROXY_ADDRESS = '0x63d3E312A9B287D9103d88b674b3B3A36B14E8e2'; // your proxy
     const USDC_ADDRESS  = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
-    const MEMO_ID       = '415bcd46-b320-4f78-b349-77538e6929a6';
+    const MEMO_ID       = 'db83e744-e43d-47e0-9ce4-802fd0a802d6';
 
     const [signer] = await ethers.getSigners();
     const from = await signer.getAddress();
@@ -34,7 +34,7 @@ describe('AuraCard mint (Base)', function () {
     const aura = new ethers.Contract(PROXY_ADDRESS, auracardAbi, signer);
 
     // First mint price = 1 cent; contract uses 1 cent = 10_000 units (USDC 6 decimals)
-    const amount = 0n; 
+    const amount = 100000n; 
 
     console.log('Approving USDC to proxy...');
     const txA = await usdc.approve(PROXY_ADDRESS, amount);
