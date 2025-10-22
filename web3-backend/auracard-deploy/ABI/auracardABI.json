@@ -479,15 +479,9 @@
       },
       {
         "indexed": false,
-        "internalType": "uint256",
+        "internalType": "int256",
         "name": "allTimePnl",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "isProfit",
-        "type": "bool"
+        "type": "int256"
       },
       {
         "indexed": false,
@@ -672,14 +666,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
+        "internalType": "int256",
         "name": "allTimePnl",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isProfit",
-        "type": "bool"
+        "type": "int256"
       },
       {
         "internalType": "uint256",
@@ -713,14 +702,9 @@
             "type": "uint256"
           },
           {
-            "internalType": "uint256",
+            "internalType": "int256",
             "name": "allTimePnl",
-            "type": "uint256"
-          },
-          {
-            "internalType": "bool",
-            "name": "isProfit",
-            "type": "bool"
+            "type": "int256"
           },
           {
             "internalType": "uint256",
@@ -769,14 +753,9 @@
             "type": "uint256"
           },
           {
-            "internalType": "uint256",
+            "internalType": "int256",
             "name": "allTimePnl",
-            "type": "uint256"
-          },
-          {
-            "internalType": "bool",
-            "name": "isProfit",
-            "type": "bool"
+            "type": "int256"
           },
           {
             "internalType": "uint256",
@@ -1153,14 +1132,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
+        "internalType": "int256",
         "name": "allTimePnl",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isProfit",
-        "type": "bool"
+        "type": "int256"
       },
       {
         "internalType": "uint256",
