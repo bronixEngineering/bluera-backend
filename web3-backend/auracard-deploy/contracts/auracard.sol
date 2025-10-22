@@ -64,8 +64,7 @@ contract AuraCardNFTContract is
     struct TokenData {
         string  holderTag;      // kullanıcı etiketi
         uint256 allTimeVolume;  // toplam volume
-        uint256 allTimePnl;     // toplam PnL
-        bool isProfit;     // toplam PnL
+        int256 allTimePnl;     // toplam PnL
         uint256 date;   
     }
     mapping(uint256 => TokenData) private _tokenData;
@@ -76,7 +75,7 @@ contract AuraCardNFTContract is
     event PaymentTokenUpdated(address newToken);
     event PaymentCollectorUpdated(address newCollector);
     event PaginationLimitUpdated(uint256 newLimit);
-    event TokenDataSet(uint256 indexed tokenId, string holderTag, uint256 allTimeVolume, uint256 allTimePnl, bool isProfit, uint256 date);
+    event TokenDataSet(uint256 indexed tokenId, string holderTag, uint256 allTimeVolume, int256 allTimePnl, uint256 date);
     event URIUpdated(uint256 indexed tokenId, string newuri);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -204,7 +203,6 @@ contract AuraCardNFTContract is
                 holderTag:     d.holderTag,
                 allTimeVolume: d.allTimeVolume,
                 allTimePnl:    d.allTimePnl,
-                isProfit:      d.isProfit,
                 date:  d.date
             });
 
@@ -231,7 +229,6 @@ contract AuraCardNFTContract is
                 holderTag:     d.holderTag,
                 allTimeVolume: d.allTimeVolume,
                 allTimePnl:    d.allTimePnl,
-                isProfit:      d.isProfit,
                 date:  d.date
             });
 
@@ -247,8 +244,7 @@ contract AuraCardNFTContract is
         uint256 tokenId,
         string calldata holderTag,
         uint256 allTimeVolume,
-        uint256 allTimePnl,
-        bool isProfit,
+        int256 allTimePnl,
         uint256 date
     ) external onlyOwner {
         require(_ownerOf(tokenId) != address(0), "data set for nonexistent token");
@@ -256,10 +252,9 @@ contract AuraCardNFTContract is
             holderTag:     holderTag,
             allTimeVolume: allTimeVolume,
             allTimePnl:    allTimePnl,
-            isProfit:      isProfit,
             date:  date
         });
-        emit TokenDataSet(tokenId, holderTag, allTimeVolume, allTimePnl, isProfit, date);
+        emit TokenDataSet(tokenId, holderTag, allTimeVolume, allTimePnl, date);
     }
 
     function getTokenData(uint256 tokenId)
@@ -268,13 +263,12 @@ contract AuraCardNFTContract is
         returns (
             string memory holderTag,
             uint256 allTimeVolume,
-            uint256 allTimePnl,
-            bool isProfit,
+            int256 allTimePnl,
             uint256 date
         )
     {
         TokenData storage d = _tokenData[tokenId];
-        return (d.holderTag, d.allTimeVolume, d.allTimePnl, d.isProfit, d.date);
+        return (d.holderTag, d.allTimeVolume, d.allTimePnl, d.date);
     }
 
     // -------------------- UUPS --------------------

@@ -3,12 +3,9 @@ import { getSupabaseServerClient } from "@/lib/supabase";
 
 export const walletStatusScheduled = schedules.task({
   id: "wallet-status-scheduled",
-  cron: "0 1 * * *",
+  cron: "0 15 * * *",
   run: async () => {
-    const baseUrl = process.env.NODE_ENV === "production" 
-      ? "https://your-production-domain.com" 
-      : "http://localhost:3000";
-    
+    const baseUrl = process.env.BACKEND_URL;
     const headers = { "Content-Type": "application/json" as const };
     const supabase = getSupabaseServerClient();
     

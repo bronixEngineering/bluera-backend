@@ -2,11 +2,9 @@ import { task, logger, schedules } from "@trigger.dev/sdk/v3";
 
 export const dexscreenerScheduled = schedules.task({
   id: "dexscreener-scheduled",
-  cron: "0 0 * * *",
+  cron: "0 15 * * *",
   run: async (payload, { ctx }) => {
-    const baseUrl = process.env.NODE_ENV === "production" 
-      ? "https://your-production-domain.com" 
-      : "http://localhost:3000";
+    const baseUrl = process.env.BACKEND_URL;
     
     const headers = { "Content-Type": "application/json" as const };
 
