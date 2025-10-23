@@ -1,17 +1,17 @@
 import { task, logger, schedules } from "@trigger.dev/sdk/v3";
 
-export const dexscreenerScheduled = schedules.task({
-  id: "dexscreener-scheduled",
+export const tokenStatusMoralisScheduled = schedules.task({
+  id: "token-status-moralis-scheduled",
   cron: "0 15 * * *",
   run: async (payload, { ctx }) => {
     const baseUrl = process.env.BACKEND_URL;
     
     const headers = { "Content-Type": "application/json" as const };
 
-    logger.log("Starting scheduled Dexscreener job", { baseUrl });
+    logger.log("Starting scheduled Token Status Moralis job", { baseUrl });
     
     try {
-      const resp = await fetch(`${baseUrl}/api/dexscreenr`, {
+      const resp = await fetch(`${baseUrl}/api/token-status-moralis`, {
         method: "POST",
         headers,
         body: JSON.stringify({ 
@@ -22,7 +22,7 @@ export const dexscreenerScheduled = schedules.task({
       
       const json: any = await resp.json().catch(() => ({}));
       
-      logger.log("Dexscreener job completed", {
+      logger.log("Token Status Moralis job completed", {
         success: json?.success,
         updated: json?.updated,
         error: json?.error
@@ -35,7 +35,7 @@ export const dexscreenerScheduled = schedules.task({
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("Dexscreener job failed", { error: error.message });
+      logger.error("Token Status Moralis job failed", { error: error.message });
       return {
         success: false,
         error: error.message,

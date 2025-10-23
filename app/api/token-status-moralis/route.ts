@@ -1,0 +1,166 @@
+import { NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase';
+
+export async function POST(request: Request) {
+  try {
+    const { chain = 'base', batchSize = 5, debugAddress } = await request.json().catch(() => ({}));
+    const debugLc = typeof debugAddress === 'string' && debugAddress ? String(debugAddress).toLowerCase() : null;
+    const debugInfo: any = debugLc
+      ? { token: debugLc, inWhitelist: false, prevVolume: null, aggregatedVolume: 0, updatePath: null, computedRate: null }
+      : null;
+
+    const supabase = getSupabaseServerClient();
+
+    // Load whitelist (+ previous total_volume_24h for rate calc)
+    const { data: whitelistRows, error: whitelistError } = await supabase
+      .from('whitelisted_tokens')
+      .select('token_address,total_volume_24h');
+    if (whitelistError) {
+      return NextResponse.json(
+        { success: false, error: `Failed to load whitelisted tokens: ${whitelistError.message}` },
+        { status: 500 }
+      );
+    }
+
+    const toNumber = (v: any) => {
+      const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const whitelistedAddresses: string[] = (whitelistRows || [])
+      .map((r: any) => (r?.token_address || '').toLowerCase())
+      .filter((s: string) => !!s);
+
+    // Maps for case-preserving token and previous volume lookup
+    const existingTokenMap = new Map<string, string>();
+    const existingVolumeMap = new Map<string, number>();
+
+    (whitelistRows || []).forEach((r: any) => {
+      const orig = String(r?.token_address || '');
+      if (!orig) return;
+      const lc = orig.toLowerCase();
+      existingTokenMap.set(lc, orig);
+      const prevVol = toNumber(r?.total_volume_24h ?? 0);
+      existingVolumeMap.set(lc, prevVol);
+    });
+
+    if (debugInfo) {
+      debugInfo.inWhitelist = existingTokenMap.has(debugLc!);
+      debugInfo.prevVolume = existingVolumeMap.has(debugLc!) ? existingVolumeMap.get(debugLc!) : null;
+    }
+
+    if (whitelistedAddresses.length === 0) {
+      return NextResponse.json({ success: true, updated: 0, message: 'No whitelisted tokens', debug: debugInfo || undefined });
+    }
+
+    const apiKey = process.env.MORALIS_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ success: false, error: 'MORALIS_API_KEY not set' }, { status: 500 });
+    }
+
+    const headers = { 
+      accept: 'application/json', 
+      'X-API-Key': apiKey 
+    };
+
+    let updated = 0;
+    const batchSizeNum = Math.max(1, Math.min(5, Number(batchSize) || 3)); // Daha küçük batch size
+
+    // Process tokens in batches
+    for (let i = 0; i < whitelistedAddresses.length; i += batchSizeNum) {
+      const batch = whitelistedAddresses.slice(i, i + batchSizeNum);
+      
+      // Process each token individually
+      for (const tokenAddress of batch) {
+        try {
+          const url = `https://deep-index.moralis.io/api/v2.2/tokens/${tokenAddress}/analytics?chain=${chain}`;
+          
+          const resp = await fetch(url, { headers });
+          
+          if (!resp.ok) {
+            const errorText = await resp.text();
+            if (debugInfo && tokenAddress === debugLc) {
+              debugInfo.error = `API Error: ${resp.status} - ${errorText}`;
+            }
+            continue;
+          }
+
+          const data = await resp.json();
+          
+          // Extract 24h data - Moralis API structure
+          const buyVolume24h = toNumber(data?.totalBuyVolume?.["24h"] ?? 0);
+          const sellVolume24h = toNumber(data?.totalSellVolume?.["24h"] ?? 0);
+          const vol24 = buyVolume24h + sellVolume24h;
+          
+          const buys24 = toNumber(data?.totalBuys?.["24h"] ?? 0);
+          const sells24 = toNumber(data?.totalSells?.["24h"] ?? 0);
+          const cnt = buys24 + sells24;
+
+          if (debugInfo && tokenAddress === debugLc) {
+            debugInfo.aggregatedVolume = vol24;
+            debugInfo.processedData = {
+              buyVolume24h,
+              sellVolume24h,
+              vol24,
+              buys24,
+              sells24,
+              cnt
+            };
+          }
+
+          // Skip if no volume data
+          if (vol24 === 0) {
+            continue;
+          }
+
+          const orig = existingTokenMap.get(tokenAddress);
+          if (!orig) {
+            continue;
+          }
+
+          const prev = toNumber(existingVolumeMap.get(tokenAddress) ?? 0);
+          const rate = prev > 0 ? (vol24 - prev) / prev : null;
+
+          // Update database
+          const { error: updateErr } = await supabase
+            .from('whitelisted_tokens')
+            .update({
+              total_swaps_24h: cnt,
+              total_volume_24h: vol24,
+              total_volume_changing_rate: rate,
+              last_update: new Date().toISOString(),
+            })
+            .eq('token_address', orig);
+
+          if (!updateErr) {
+            updated += 1;
+            // Update local maps for rate calculations
+            existingVolumeMap.set(tokenAddress, vol24);
+          }
+
+        } catch (error: any) {
+          if (debugInfo && tokenAddress === debugLc) {
+            debugInfo.error = error.message;
+          }
+          continue;
+        }
+      }
+
+      // Delay between batches to avoid rate limits
+      if (i + batchSizeNum < whitelistedAddresses.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      updated, 
+      chain, 
+      timestamp: new Date().toISOString(), 
+      debug: debugInfo || undefined 
+    });
+  } catch (e: any) {
+    console.error('Fatal error:', e);
+    return NextResponse.json({ success: false, error: e?.message ?? 'Unknown error' }, { status: 500 });
+  }
+}

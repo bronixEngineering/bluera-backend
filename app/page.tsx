@@ -30,11 +30,12 @@ export default function Home() {
         hours: 24,
         maxPages: 3,
       };
-      const resp = await fetch('/api/wallet-token-status-moralis', {
+      const resp = await fetch('/api/token-status-moralis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      console.log('wts resp', resp);
       const data = await resp.json();
       setWtsResult(data);
     } catch (e: any) {
@@ -49,11 +50,11 @@ export default function Home() {
     .map(([k]) => k);
 
 
-    const runDexscreener = async () => {
+    const runTokenStatusMoralis = async () => {
       setDexLoading(true);
       setDexResults(null);
       try {
-        const resp = await fetch('/api/dexscreenr', {
+        const resp = await fetch('/api/token-status-moralis', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chain: 'base', batchSize: 20 }),
@@ -511,11 +512,11 @@ export default function Home() {
               </button>
 
               <button
-                onClick={runDexscreener}
+                onClick={runTokenStatusMoralis}
                 disabled={dexLoading}
                 className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400"
               >
-                {dexLoading ? 'Refreshing Dexscreener…' : 'Refresh Dexscreener (Whitelist)'}
+                {dexLoading ? 'Refreshing Token Status Moralis…' : 'Refresh Token Status Moralis (Whitelist)'}
               </button>
               <button
                     onClick={runWalletTokenStatus}

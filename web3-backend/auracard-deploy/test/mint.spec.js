@@ -9,9 +9,9 @@ describe('AuraCard mint (Base)', function () {
 
   it('approves USDC on USDC contract and calls mint(string) on proxy', async function () {
     // REQUIRED: .env -> PRIVATE_KEY must be configured in hardhat network accounts
-    const PROXY_ADDRESS = '0x63d3E312A9B287D9103d88b674b3B3A36B14E8e2'; // your proxy
+    const PROXY_ADDRESS = '0x0BDDf09e207B0303f3F5CA5Af69C9b2ECF74b453'; // your proxy
     const USDC_ADDRESS  = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
-    const MEMO_ID       = 'db83e744-e43d-47e0-9ce4-802fd0a802d6';
+    const MEMO_ID       = '4c4aa5c4-d96e-4c9c-8f87-24af78b88678';
 
     const [signer] = await ethers.getSigners();
     const from = await signer.getAddress();
@@ -34,15 +34,12 @@ describe('AuraCard mint (Base)', function () {
     const aura = new ethers.Contract(PROXY_ADDRESS, auracardAbi, signer);
 
     // First mint price = 1 cent; contract uses 1 cent = 10_000 units (USDC 6 decimals)
-    const amount = 100000n; 
+    const amount = 1000000n; 
 
     console.log('Approving USDC to proxy...');
     const txA = await usdc.approve(PROXY_ADDRESS, amount);
     await txA.wait();
     console.log('Approve tx:', txA.hash);
-
-    // Add this small test or a second `it(...)` block in web3-backend/auracard-deploy/test/mint.spec.js
-// Add this small test or a second `it(...)` block in web3-backend/auracard-deploy/test/mint.spec.js
 
     // Call mint(string)
     console.log('Calling mint...');

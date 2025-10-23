@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const walletAddress = String(body?.walletAddress || '').trim();
     const chain = 'base';
     const hours = Number.isFinite(body?.hours) ? Math.max(1, Math.min(168, Number(body.hours))) : 24;
-    const maxPages = 10;
+    const maxPages = 5;
 
     if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
       return NextResponse.json({ success: false, error: 'Invalid walletAddress' }, { status: 400 });
