@@ -1,8 +1,8 @@
-import { task, logger, schedules } from "@trigger.dev/sdk/v3";
+import { logger, schedules } from "@trigger.dev/sdk/v3";
 
 export const tokenStatusMoralisScheduled = schedules.task({
   id: "token-status-moralis-scheduled",
-  cron: "0 15 * * *",
+  cron: "0 11 * * *",
   run: async (payload, { ctx }) => {
     const baseUrl = process.env.BACKEND_URL;
     

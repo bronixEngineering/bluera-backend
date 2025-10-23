@@ -30,7 +30,7 @@ export default function Home() {
         hours: 24,
         maxPages: 3,
       };
-      const resp = await fetch('/api/token-status-moralis', {
+      const resp = await fetch('/api/wallet-token-status-moralis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

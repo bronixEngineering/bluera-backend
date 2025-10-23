@@ -1,15 +1,16 @@
-import { schedules, logger } from "@trigger.dev/sdk/v3";
+import { logger, schedules } from "@trigger.dev/sdk/v3";
 import { getSupabaseServerClient } from "@/lib/supabase";
 
-export const walletStatusScheduled = schedules.task({
-  id: "wallet-status-scheduled",
-  cron: "0 11 * * *",
+export const walletTokenStatusScheduled = schedules.task({
+  id: "wallet-token-status-scheduled",
+  maxDuration: 1800, // 30 minutes
+  cron: "0 11 * * *", 
   run: async () => {
     const baseUrl = process.env.BACKEND_URL;
     const headers = { "Content-Type": "application/json" as const };
     const supabase = getSupabaseServerClient();
     
-    logger.log("Starting scheduled wallet status job", { baseUrl });
+    logger.log("Starting scheduled wallet token status job", { baseUrl });
     
     try {
       // Load all wallets from wallets_status table
@@ -33,8 +34,8 @@ export const walletStatusScheduled = schedules.task({
         return { success: true, wallets: 0, message: "No wallets to process" };
       }
       
-      // Process wallets in batches of 5 to avoid rate limits
-      const batchSize = 5;
+      // Process wallets in batches of 3 to avoid rate limits
+      const batchSize = 3;
       const batches: string[][] = [];
       for (let i = 0; i < wallets.length; i += batchSize) {
         batches.push(wallets.slice(i, i + batchSize));
@@ -48,13 +49,13 @@ export const walletStatusScheduled = schedules.task({
         const batchResults = await Promise.allSettled(
           batch.map(async (wallet) => {
             try {
-              const resp = await fetch(`${baseUrl}/api/wallet-status-moralis`, {
+              const resp = await fetch(`${baseUrl}/api/wallet-token-status-moralis`, {
                 method: "POST",
                 headers,
                 body: JSON.stringify({ 
                   walletAddress: wallet, 
-                  chain: "base",
-                  maxPages: 10 
+                  hours: 24,
+                  maxPages: 5
                 }),
               });
               
@@ -78,10 +79,10 @@ export const walletStatusScheduled = schedules.task({
         }
         
         // Small delay between batches to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      logger.log("Wallet status job completed", {
+      logger.log("Wallet token status job completed", {
         total: wallets.length,
         success: successCount,
         failed: failCount
@@ -96,7 +97,7 @@ export const walletStatusScheduled = schedules.task({
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("Wallet status job failed", { error: error.message });
+      logger.error("Wallet token status job failed", { error: error.message });
       return {
         success: false,
         error: error.message,
@@ -105,4 +106,3 @@ export const walletStatusScheduled = schedules.task({
     }
   },
 });
-
