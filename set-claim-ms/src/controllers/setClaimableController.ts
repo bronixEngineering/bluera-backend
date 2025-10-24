@@ -44,27 +44,38 @@ async function initializeWeb3Utils(): Promise<Web3Utils | null> {
 /**
  * POST /api/set-claimable
  * Sets claimable amount for a wallet address using the default amount
- * Handles Supabase webhook payloads from claimable_addresses table
+ * Handles Supabase webhook payloads from farcaster_notifications table
  * 
- * Request body: Supabase webhook payload with record.wallet_address
+ * Request body: Supabase webhook payload with record.fid
  */
 export const setClaimable = async (req: Request, res: Response): Promise<void> => {
   try {
     const { type, table, record } = req.body;
 
     // Validate webhook payload structure
-    if (!record || !record.wallet_address) {
+    if (!record || !record.fid) {
       res.status(400).json({ 
-        error: "Missing required field: record.wallet_address" 
+        error: "Missing required field: record.fid" 
       });
       return;
     }
 
-    // Extract wallet address from webhook payload
-    const walletAddress = record.wallet_address;
+    // Extract fid from webhook payload
+    const fid = record.fid;
+
+    // Fetch wallet address from database using fid
+    const walletAddress = await supabaseUtils.getWalletAddressByFid(fid);
+
+    if (!walletAddress) {
+      console.error(`No wallet found for fid: ${fid}`);
+      res.status(400).json({ 
+        error: `No wallet found for fid: ${fid}` 
+      });
+      return;
+    }
 
     // Log webhook details for debugging
-    console.log(`Processing webhook: type=${type}, table=${table}, wallet=${walletAddress}`);
+    console.log(`Processing webhook: type=${type}, table=${table}, fid=${fid}, wallet=${walletAddress}`);
 
     // Initialize Web3Utils (cached after first call)
     const web3Utils = await initializeWeb3Utils();

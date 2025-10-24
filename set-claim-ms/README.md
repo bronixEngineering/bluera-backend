@@ -87,7 +87,7 @@ curl -X GET http://localhost:3000/api/hello-world \
 
 ### POST /api/set-claimable
 
-Sets claimable token amount for a wallet address on the blockchain using the default amount. This endpoint is designed to handle Supabase database webhooks from the `claimable_addresses` table.
+Sets claimable token amount for a wallet address on the blockchain using the default amount. This endpoint is designed to handle Supabase database webhooks from the `farcaster_notifications` table.
 
 **Authentication**: Required (API Key)
 
@@ -101,12 +101,13 @@ Content-Type: application/json
 ```json
 {
   "type": "INSERT",
-  "table": "claimable_addresses",
+  "table": "farcaster_notifications",
   "schema": "public",
   "record": {
-    "created_at": "2025-10-21T18:10:50.351557+00:00",
-    "wallet_address": "0x1234567890123456789012345678901234567890",
-    "claimable_right": null
+    "fid": "1120453",
+    "updated_at": "2025-10-21T18:10:50.351557+00:00",
+    "notification_url": "https://api.farcaster.xyz/v1/frame-notifications",
+    "notification_token": "019a0aba-ca8a-63eb-85d6-f9c6f31704a5"
   },
   "old_record": null
 }
@@ -135,18 +136,21 @@ curl -X POST http://localhost:3000/api/set-claimable \
   -H "Content-Type: application/json" \
   -d '{
     "type": "INSERT",
-    "table": "claimable_addresses",
+    "table": "farcaster_notifications",
     "schema": "public",
     "record": {
-      "wallet_address": "0x1234567890123456789012345678901234567890"
+      "fid": "1120453"
     }
   }'
 ```
 
 **Note**: 
-- The endpoint extracts the wallet address from `record.wallet_address` in the webhook payload
+- The endpoint extracts the Farcaster ID (fid) from `record.fid` in the webhook payload
+- The wallet address is fetched from the `wallets_status` table using the fid
+- If multiple wallets are found for the same fid, the first one is used
+- Returns 400 error if no wallet is found for the given fid
 - The claimable amount is set to `DEFAULT_SET_CLAIMABLE_AMOUNT` constant (20000), which is defined in `src/utils/constants.ts`
-- This endpoint is designed to be triggered automatically by Supabase webhooks when new records are inserted into the `claimable_addresses` table
+- This endpoint is designed to be triggered automatically by Supabase webhooks when new records are inserted into the `farcaster_notifications` table
 
 ## Project Structure
 
@@ -235,7 +239,7 @@ The `railway.toml` file configures:
 
 After deployment, configure your Supabase webhook:
 1. Go to your Supabase project → Database → Webhooks
-2. Create a new webhook for the `claimable_addresses` table
+2. Create a new webhook for the `farcaster_notifications` table
 3. Set the webhook URL to: `https://your-railway-app.railway.app/api/set-claimable`
 4. Add header: `x-api-key: your-api-key`
 5. Set trigger to: INSERT events

@@ -33,4 +33,34 @@ export default class SupabaseUtils {
       return null;
     }
   }
+
+  async getWalletAddressByFid(fid: string) {
+    try {
+      const { data: wallets, error: selectError } = await this.supabase
+        .from("wallets_status")
+        .select("wallet_address")
+        .eq("fid", fid);
+
+      if (selectError) {
+        console.error(`Error fetching wallet address for fid: ${fid}`, selectError);
+        return null;
+      }
+
+      if (!wallets || wallets.length === 0) {
+        console.log(`No wallet found for fid: ${fid}`);
+        return null;
+      }
+
+      if (wallets.length > 1) {
+        console.log(`Multiple wallets found for fid: ${fid}, taking the first one`);
+      } else {
+        console.log(`Wallet found for fid: ${fid}`);
+      }
+
+      return wallets[0].wallet_address;
+    } catch (error) {
+      console.error("ERROR FETCHING WALLET ADDRESS: ", error);
+      return null;
+    }
+  }
 }
