@@ -94,37 +94,6 @@ export default class SupabaseUtils {
     }
   }
 
-  async upsertNftOwnership(transferLog: any) {
-    try {
-      const ownershipDoc = {
-        nft_id: transferLog.nft_id,
-        owner_wallet: transferLog.to_address,
-        updated_at: transferLog.created_at,
-        nft_rarity: transferLog.nft_rarity
-      };
-      const { data, error } = await this.supabase
-        .from("universe_nfts")
-        .upsert(ownershipDoc, { onConflict: "nft_id" });
-      if (error) {
-        console.error(`Error upserting nft ownership:`, error);
-        return {
-          isSuccess: false,
-          errorMessage: String(error),
-        };
-      }
-      return {
-        isSuccess: true,
-        errorMessage: undefined,
-      };
-    } catch (error) {
-      console.log("ERROR UPSERTING NFT OWNERSHIP: ", error);
-      return {
-        isSuccess: false,
-        errorMessage: String(error),
-      };
-    }
-  }
-
   async updateAuraCard(supabaseId: string, tokenId: number) {
     try {
       const { data, error } = await this.supabase
