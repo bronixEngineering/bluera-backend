@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     };
 
     let updated = 0;
-    const batchSizeNum = Math.max(1, Math.min(5, Number(batchSize) || 3)); // Daha küçük batch size
+    const batchSizeNum = Math.max(1, Math.min(5, Number(batchSize) || 3));
 
     // Process tokens in batches
     for (let i = 0; i < whitelistedAddresses.length; i += batchSizeNum) {
@@ -87,14 +87,27 @@ export async function POST(request: Request) {
 
           const data = await resp.json();
           
-          // Extract 24h data - Moralis API structure
+          // Extract 24h data from the new API response structure
           const buyVolume24h = toNumber(data?.totalBuyVolume?.["24h"] ?? 0);
           const sellVolume24h = toNumber(data?.totalSellVolume?.["24h"] ?? 0);
           const vol24 = buyVolume24h + sellVolume24h;
           
           const buys24 = toNumber(data?.totalBuys?.["24h"] ?? 0);
           const sells24 = toNumber(data?.totalSells?.["24h"] ?? 0);
-          const cnt = buys24 + sells24;
+          const totalSwaps24h = buys24 + sells24;
+
+          // Extract additional data from the new API response
+          const usdPrice = data?.usdPrice ? String(data.usdPrice) : null;
+          const totalLiquidityUsd = data?.totalLiquidityUsd ? String(data.totalLiquidityUsd) : null;
+          const totalFullyDilutedValuation = data?.totalFullyDilutedValuation ? String(data.totalFullyDilutedValuation) : null;
+          
+          // Extract price percent changes as JSONB
+          const pricePercentChange = data?.pricePercentChange ? {
+            "5m": toNumber(data.pricePercentChange["5m"]),
+            "1h": toNumber(data.pricePercentChange["1h"]),
+            "6h": toNumber(data.pricePercentChange["6h"]),
+            "24h": toNumber(data.pricePercentChange["24h"])
+          } : null;
 
           if (debugInfo && tokenAddress === debugLc) {
             debugInfo.aggregatedVolume = vol24;
@@ -104,7 +117,11 @@ export async function POST(request: Request) {
               vol24,
               buys24,
               sells24,
-              cnt
+              totalSwaps24h,
+              usdPrice,
+              totalLiquidityUsd,
+              totalFullyDilutedValuation,
+              pricePercentChange
             };
           }
 
@@ -121,14 +138,20 @@ export async function POST(request: Request) {
           const prev = toNumber(existingVolumeMap.get(tokenAddress) ?? 0);
           const rate = prev > 0 ? (vol24 - prev) / prev : null;
 
-          // Update database
+          // Update database with new schema
           const { error: updateErr } = await supabase
             .from('whitelisted_tokens')
             .update({
-              total_swaps_24h: cnt,
+              total_swaps_24h: totalSwaps24h,
               total_volume_24h: vol24,
               total_volume_changing_rate: rate,
               last_update: new Date().toISOString(),
+              usd_price: usdPrice,
+              total_liquidity_usd: totalLiquidityUsd,
+              total_fully_diluted_valuation: totalFullyDilutedValuation,
+              price_percent_change: pricePercentChange,
+              // Note: token_ticker, token_type, image_url are not provided by Moralis API
+              // These would need to be set separately or through a different data source
             })
             .eq('token_address', orig);
 
