@@ -3,7 +3,6 @@ import { getSupabaseServerClient } from "@/lib/supabase";
 
 export const walletTokenStatusScheduled = schedules.task({
   id: "wallet-token-status-scheduled",
-  maxDuration: 1800, // 30 minutes
   cron: "0 11 * * *", 
   run: async () => {
     const baseUrl = process.env.BACKEND_URL;
