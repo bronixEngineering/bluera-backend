@@ -1,15 +1,14 @@
 import { logger, schedules } from "@trigger.dev/sdk/v3";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { walletTokenStatusWorker } from "./wallet_token_status_worker";
 
 export const walletTokenStatusScheduled = schedules.task({
   id: "wallet-token-status-scheduled",
   cron: "0 11 * * *", 
   run: async () => {
-    const baseUrl = process.env.BACKEND_URL;
-    const headers = { "Content-Type": "application/json" as const };
     const supabase = getSupabaseServerClient();
     
-    logger.log("Starting scheduled wallet token status job", { baseUrl });
+    logger.log("Starting scheduled wallet-token enqueue");
     
     try {
       // Load all wallets from wallets_status table
@@ -27,76 +26,48 @@ export const walletTokenStatusScheduled = schedules.task({
         new Set((rows || []).map((r: any) => String(r.wallet_address || "").toLowerCase()).filter(Boolean))
       );
       
-      logger.log("Processing wallets", { count: wallets.length });
-      
       if (wallets.length === 0) {
-        return { success: true, wallets: 0, message: "No wallets to process" };
+        return { success: true, enqueued: 0, message: "No wallets to enqueue" };
       }
-      
-      // Process wallets in batches of 3 to avoid rate limits
-      const batchSize = 3;
-      const batches: string[][] = [];
-      for (let i = 0; i < wallets.length; i += batchSize) {
-        batches.push(wallets.slice(i, i + batchSize));
+
+      // Env-tuneable controls
+      const LIMIT = Number(process.env.WALLET_TOKEN_ENQUEUE_LIMIT || 1500);
+      const BATCH = Number(process.env.WALLET_TOKEN_ENQUEUE_BATCH || 75);
+      const DELAY_MS = Number(process.env.WALLET_TOKEN_ENQUEUE_DELAY_MS || 500);
+      const SHARD_TOTAL = Number(process.env.WALLET_TOKEN_SHARD_TOTAL || 1);
+      const SHARD_INDEX = Number(process.env.WALLET_TOKEN_SHARD_INDEX || 0);
+
+      // Simple string hash for client-side sharding
+      function hashStr(s: string) {
+        let h = 0;
+        for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        return Math.abs(h);
       }
-      
-      let successCount = 0;
-      let failCount = 0;
-      const results: Array<{ wallet: string; success: boolean; error?: string }> = [];
-      
-      for (const batch of batches) {
-        const batchResults = await Promise.allSettled(
-          batch.map(async (wallet) => {
-            try {
-              const resp = await fetch(`${baseUrl}/api/wallet-token-status-moralis`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ 
-                  walletAddress: wallet, 
-                  hours: 24,
-                  maxPages: 5
-                }),
-              });
-              
-              const json: any = await resp.json().catch(() => ({}));
-              const success = !!json?.success;
-              
-              return { wallet, success, error: success ? undefined : json?.error };
-            } catch (error: any) {
-              return { wallet, success: false, error: error.message };
-            }
-          })
+      const sharded = SHARD_TOTAL > 1
+        ? wallets.filter(w => (hashStr(w) % SHARD_TOTAL) === SHARD_INDEX)
+        : wallets;
+      const toEnqueue = sharded.slice(0, LIMIT);
+
+      // Enqueue in chunks with dedupe
+      let enqueued = 0;
+      for (let i = 0; i < toEnqueue.length; i += BATCH) {
+        const chunk = toEnqueue.slice(i, i + BATCH);
+        await Promise.allSettled(
+          chunk.map((w) => walletTokenStatusWorker.trigger({ walletAddress: w, hours: 24 }))
         );
-        
-        for (const result of batchResults) {
-          if (result.status === "fulfilled") {
-            results.push(result.value);
-            if (result.value.success) successCount++; else failCount++;
-          } else {
-            failCount++;
-          }
-        }
-        
-        // Small delay between batches to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        enqueued += chunk.length;
+        await new Promise((r) => setTimeout(r, DELAY_MS));
       }
       
-      logger.log("Wallet token status job completed", {
-        total: wallets.length,
-        success: successCount,
-        failed: failCount
-      });
+      logger.log("Wallet-token enqueue completed", { enqueued });
       
       return {
         success: true,
-        total: wallets.length,
-        successCount,
-        failCount,
-        results,
+        enqueued,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("Wallet token status job failed", { error: error.message });
+      logger.error("Wallet-token enqueue failed", { error: error.message });
       return {
         success: false,
         error: error.message,
