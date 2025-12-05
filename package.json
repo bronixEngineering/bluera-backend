@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "import:wallets": "tsx scripts/import_top_wallets.ts"
+    "import:wallets": "tsx scripts/import_top_wallets.ts",
+    "update:wallet": "tsx scripts/update_wallet_status.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.74.0",
