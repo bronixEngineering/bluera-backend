@@ -1,0 +1,24 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+rootDirectory = "mint-listener"
+
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+[environments.production]
+# Environment variables will be set in Railway dashboard
+# Required variables:
+# - NFT_CONTRACT_ADDRESS (the smart contract address to monitor)
+# - SUPABASE_URL (Supabase project URL)
+# - SUPABASE_KEY (Supabase service role key)
+# - RPC_URL (Blockchain RPC endpoint - Infura/Alchemy/etc)
+
+[environments.production.variables]
+NODE_ENV = "production"
+
+# Note: This is a background event listener service (no HTTP server)
+# It runs on a 30-second polling loop after a 35-second initial delay
+# Logs can be monitored via Railway dashboard
+
