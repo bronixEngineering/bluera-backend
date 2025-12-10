@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /**
  * AuraCardNFTContract (Upgradeable, ERC20-paid)
- * - İlk mint: firstMintUsdCents (varsayılan 1¢)
+ * - İlk mint: firstMintUsdCents (varsayılan 0¢)
  * - Sonraki mintler: subsequentMintUsdCents (varsayılan 10¢)
  * - Ödeme: ERC20 (USDC-benzeri 6 dec varsayımıyla cent->tokenUnits: 1 cent = 10_000)
  * - paymentCollector: mint ödemeleri direkt bu adrese gider (owner ayarlanabilir)
@@ -45,7 +45,7 @@ contract AuraCardNFTContract is
     address public paymentCollector;          // mint gelirleri buraya gider (owner ayarlanabilir)
 
     // ---------- Pricing (cents) ----------
-    uint256 public firstMintUsdCents;         // varsayılan 1
+    uint256 public firstMintUsdCents;         // varsayılan 0
     uint256 public subsequentMintUsdCents;    // varsayılan 10
     uint256 private constant CENT_TO_USDC_UNITS = 10000; // 1 cent = 10_000 (6 dec token varsayımı)
 
@@ -136,6 +136,14 @@ contract AuraCardNFTContract is
     }
 
     // -------------------- Admin --------------------
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     function setFirstMintUsdCents(uint256 cents) external onlyOwner {
         firstMintUsdCents = cents;
         emit PricesUpdated(firstMintUsdCents, subsequentMintUsdCents);
@@ -157,8 +165,6 @@ contract AuraCardNFTContract is
         paymentToken = IERC20(newToken);
         emit PaymentTokenUpdated(newToken);
     }
-
-
 
     function setTokenURI(uint256 tokenId, string memory uri) public onlyOwner {
         require(_ownerOf(tokenId) != address(0), "URI set for nonexistent token");
@@ -235,9 +241,6 @@ contract AuraCardNFTContract is
             unchecked { ++i; }
         }
     }
-
-
-
 
     // -------------------- TokenData (store on-chain) --------------------
     function setTokenData(

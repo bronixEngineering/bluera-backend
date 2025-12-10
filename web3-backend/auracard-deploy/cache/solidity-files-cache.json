@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/metehan_caliskan/Desktop/github/bluera-backend/web3-backend/auracard-deploy/contracts/auracard.sol": {
-      "lastModificationDate": 1761142715508,
-      "contentHash": "6149538413bea13cce1837720b696f4b",
+      "lastModificationDate": 1765398149760,
+      "contentHash": "e1c492647a8250fe58249f99cbf8c56c",
       "sourceName": "contracts/auracard.sol",
       "solcConfig": {
         "version": "0.8.24",
