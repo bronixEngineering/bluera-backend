@@ -7,26 +7,29 @@
     "build": "next build",
     "start": "next start",
     "import:wallets": "tsx scripts/import_top_wallets.ts",
+    "seed:whitelist": "tsx scripts/seed_whitelist_from_dexscreener.ts",
     "update:wallet": "tsx scripts/update_wallet_status.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.74.0",
-    "@trigger.dev/sdk": "4.1.2",
+    "@trigger.dev/sdk": "4.2.0",
     "next": "14.2.5",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "web3": "1"
   },
   "devDependencies": {
-    "@trigger.dev/build": "4.1.2",
+    "@trigger.dev/build": "4.2.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web3": "^1.2.2",
     "autoprefixer": "^10.4.17",
     "dotenv": "^17.2.3",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
   }
 }
