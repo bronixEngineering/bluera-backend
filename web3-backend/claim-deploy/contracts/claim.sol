@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-
-/// @title ERC20‐Based Claim Contract
-/// @notice Tracks “claimable” balances per user and lets them withdraw a specific ERC20 token
-contract BlueraClaimContract is Ownable, ReentrancyGuard {
+/// @title ERC20‐Based Claim Contract (Upgradeable)
+/// @notice Tracks "claimable" balances per user and lets them withdraw a specific ERC20 token
+contract BlueraClaimContract is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @notice The ERC20 token that will be distributed when users claim
     IERC20 public rewardToken;
 
-    /// @notice Maps each user address to the amount of `rewardToken` they can claim (in token’s smallest unit)
+    /// @notice Maps each user address to the amount of `rewardToken` they can claim (in token's smallest unit)
     mapping(address => uint256) public claimable;
 
-    /// @notice Emitted when a user’s claimable balance is updated
+    /// @notice Emitted when a user's claimable balance is updated
     /// @param user The address whose balance changed
     /// @param newTotal The new claimable balance
     /// @param timestamp The block.timestamp at which the update occurred
@@ -36,16 +37,40 @@ contract BlueraClaimContract is Ownable, ReentrancyGuard {
     /// @param timestamp The block.timestamp at which the change occurred
     event RewardTokenChanged(address indexed oldToken, address indexed newToken, uint256 timestamp);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Initializes the contract (replaces constructor for upgradeable contracts)
     /// @param _rewardToken The address of the ERC20 token to be distributed on claim
-    constructor(address _rewardToken) Ownable(msg.sender) {
+    /// @param _owner The address that will own the contract
+    function initialize(address _rewardToken, address _owner) public initializer {
         require(_rewardToken != address(0), "Zero token address");
+        require(_owner != address(0), "Zero owner address");
+        
+        __Ownable_init(_owner);
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+        
         rewardToken = IERC20(_rewardToken);
     }
+
+    /// @notice Authorizes upgrade (only owner can upgrade)
+    /// @dev Required by UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @notice Allows the contract to receive native ETH (unused here, but kept for completeness)
     receive() external payable {}
 
-    /// @notice Owner can set or top up a user’s “claimable” balance (in token units)
+    /// @notice Get the claimable amount for a specific wallet address
+    /// @param user The wallet address to check
+    /// @return The amount of tokens the user can claim (in token's smallest unit)
+    function getClaimableAmount(address user) external view returns (uint256) {
+        return claimable[user];
+    }
+
+    /// @notice Owner can set or top up a user's "claimable" balance (in token units)
     /// @dev Only callable by the contract owner
     /// @param user The address to credit
     /// @param amount The amount of `rewardToken` (in its smallest unit) to add
@@ -67,7 +92,7 @@ contract BlueraClaimContract is Ownable, ReentrancyGuard {
         }
     }
 
-    /// @notice Owner can overwrite a user’s “claimable” balance directly
+    /// @notice Owner can overwrite a user's "claimable" balance directly
     /// @dev Only callable by the contract owner
     /// @param user The address whose balance will be set
     /// @param newAmount The exact new amount (in `rewardToken` smallest unit) to assign
@@ -94,7 +119,6 @@ contract BlueraClaimContract is Ownable, ReentrancyGuard {
         emit Claimed(user, amount, block.timestamp);
     }
 
-
     /// @notice Owner can update the ERC20 token address used for claims
     /// @dev Only callable by the contract owner
     /// @param newToken The new ERC20 token contract address
@@ -105,7 +129,6 @@ contract BlueraClaimContract is Ownable, ReentrancyGuard {
 
         rewardToken = IERC20(newToken);
         emit RewardTokenChanged(old, newToken, block.timestamp);
-
     }
 
     /// @notice Owner can withdraw any ERC20 tokens accidentally sent to this contract

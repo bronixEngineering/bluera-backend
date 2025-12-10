@@ -1,4 +1,5 @@
-# bluera-backend
-Supabase backend for tracking onchain activity across Base. Aggregates wallet–token relationships, builds ecosystem/user heatmaps, leaderboards, and shareable aura data for Farcaster FIDs.
-
-npx trigger.dev@latest dev
+=== Claim Contract Deployment Info ===
+Proxy Contract Address: 0x4ee23358C634f80EA26793d605390a9BC4EF997D
+Reward Token: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+Owner: 0xf143F7a0Edb5bAF937A0a01CaE6CBc2C16A82e70
+Implementation Address: 0x69a706E99430d9a4325910a9d1369D29ce933F7c
