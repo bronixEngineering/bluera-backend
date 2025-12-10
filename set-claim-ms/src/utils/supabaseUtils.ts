@@ -63,4 +63,29 @@ export default class SupabaseUtils {
       return null;
     }
   }
+
+  async insertClaimableAddress(walletAddress: string) {
+    try {
+      const { error: insertError } = await this.supabase
+        .from("claimable_addresses")
+        .insert({
+          wallet_address: walletAddress,
+        });
+
+      if (insertError) {
+        // Check if it's a duplicate key error (code 23505 is unique violation)
+        if (insertError.code === "23505") {
+          console.error(`Wallet address already exists in claimable_addresses: ${walletAddress}`);
+        } else {
+          console.error(`Error inserting into claimable_addresses:`, insertError);
+        }
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("ERROR INSERTING INTO CLAIMABLE_ADDRESSES: ", error);
+      return false;
+    }
+  }
 }
