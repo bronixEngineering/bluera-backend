@@ -63,6 +63,65 @@ export const setClaimable = async (req: Request, res: Response): Promise<void> =
     // Extract fid from webhook payload
     const fid = record.fid;
 
+    // Check mindshare from Inflynce API
+    try {
+      const inflynceResponse = await fetch(
+        `https://api.inflynce.com/api/v1/mindshare/user/${fid}`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${process.env.INFLYNCE_API_KEY}`
+          }
+        }
+      );
+
+      if (!inflynceResponse.ok) {
+        console.error(`Inflynce API error: ${inflynceResponse.status} ${inflynceResponse.statusText}`);
+        res.status(500).json({ 
+          error: "Failed to fetch mindshare data",
+          message: `Inflynce API returned status ${inflynceResponse.status}`
+        });
+        return;
+      }
+
+      const inflynceData = await inflynceResponse.json();
+      console.log("Inflynce API Response Data:", JSON.stringify(inflynceData, null, 2));
+
+      // Extract mindshare value
+      const mindshare = inflynceData.data?.[0]?.mindshare;
+      
+      if (mindshare === undefined || mindshare === null) {
+        console.error(`No mindshare data found for fid: ${fid}`);
+        res.status(500).json({ 
+          error: "No mindshare data found",
+          message: `Could not retrieve mindshare for fid: ${fid}`
+        });
+        return;
+      }
+
+      console.log(`Mindshare for fid ${fid}: ${mindshare}`);
+
+      // Check if mindshare is below threshold
+      if (mindshare < 0.00001) {
+        console.log(`Mindshare too low for fid ${fid}: ${mindshare} < 0.00001. No action taken.`);
+        res.status(200).json({ 
+          message: "Mindshare too low, no action taken",
+          fid: fid,
+          mindshare: mindshare
+        });
+        return;
+      }
+
+      console.log(`Mindshare check passed for fid ${fid}: ${mindshare} >= 0.00001. Processing request.`);
+    } catch (error) {
+      console.error("Error fetching mindshare from Inflynce API:", error);
+      res.status(500).json({ 
+        error: "Failed to check mindshare",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+      return;
+    }
+
     // Fetch wallet address from database using fid
     const walletAddress = await supabaseUtils.getWalletAddressByFid(fid);
 
@@ -92,6 +151,14 @@ export const setClaimable = async (req: Request, res: Response): Promise<void> =
 
     // Return result as-is
     if (result.isSuccess) {
+      // Insert into claimable_addresses table
+      try {
+        await supabaseUtils.insertClaimableAddress(walletAddress);
+      } catch (error) {
+        console.error("Error inserting into claimable_addresses:", error);
+        // Continue anyway - don't fail the request
+      }
+      
       res.status(200).json(result);
     } else {
       res.status(500).json(result);
