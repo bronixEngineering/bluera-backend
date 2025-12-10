@@ -99,7 +99,7 @@ npx trigger.dev@latest dev
 
 **External APIs**: Moralis `wallets/{address}/tokens`, `wallets/{address}/swaps`
 
-**DB Effect**: Update `wallet_token_status` if row exists; otherwise insert.
+**DB Effect**: Update `wallet_token_status` if row exists; otherwise insert
 
 #### Request Body
 ```json
