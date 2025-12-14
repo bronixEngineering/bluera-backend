@@ -42,25 +42,44 @@ export default class SupabaseUtils {
         .eq("fid", fid);
 
       if (selectError) {
-        console.error(`Error fetching wallet address for fid: ${fid}`, selectError);
+        console.error(`Error fetching wallet addresses for fid: ${fid}`, selectError);
         return null;
       }
 
       if (!wallets || wallets.length === 0) {
-        console.log(`No wallet found for fid: ${fid}`);
+        console.log(`No wallets found for fid: ${fid}`);
         return null;
       }
 
-      if (wallets.length > 1) {
-        console.log(`Multiple wallets found for fid: ${fid}, taking the first one`);
-      } else {
-        console.log(`Wallet found for fid: ${fid}`);
+      console.log(`Found ${wallets.length} wallet(s) for fid: ${fid}`);
+      return wallets.map((w: any) => w.wallet_address);
+    } catch (error) {
+      console.error("ERROR FETCHING WALLET ADDRESSES: ", error);
+      return null;
+    }
+  }
+
+  async checkWalletExists(walletAddress: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from("claimable_addresses")
+        .select("wallet_address")
+        .eq("wallet_address", walletAddress)
+        .single();
+
+      if (error) {
+        // If error code is PGRST116, it means no rows found (doesn't exist)
+        if (error.code === "PGRST116") {
+          return false;
+        }
+        console.error(`Error checking if wallet exists in claimable_addresses:`, error);
+        return false;
       }
 
-      return wallets[0].wallet_address;
+      return data !== null;
     } catch (error) {
-      console.error("ERROR FETCHING WALLET ADDRESS: ", error);
-      return null;
+      console.error("ERROR CHECKING WALLET EXISTS: ", error);
+      return false;
     }
   }
 

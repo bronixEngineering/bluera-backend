@@ -122,19 +122,19 @@ export const setClaimable = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Fetch wallet address from database using fid
-    const walletAddress = await supabaseUtils.getWalletAddressByFid(fid);
+    // Fetch wallet addresses from database using fid
+    const walletAddresses = await supabaseUtils.getWalletAddressByFid(fid);
 
-    if (!walletAddress) {
-      console.error(`No wallet found for fid: ${fid}`);
+    if (!walletAddresses || walletAddresses.length === 0) {
+      console.error(`No wallets found for fid: ${fid}`);
       res.status(400).json({ 
-        error: `No wallet found for fid: ${fid}` 
+        error: `No wallets found for fid: ${fid}` 
       });
       return;
     }
 
     // Log webhook details for debugging
-    console.log(`Processing webhook: type=${type}, table=${table}, fid=${fid}, wallet=${walletAddress}`);
+    console.log(`Processing webhook: type=${type}, table=${table}, fid=${fid}, wallets=${walletAddresses.length}`);
 
     // Initialize Web3Utils (cached after first call)
     const web3Utils = await initializeWeb3Utils();
@@ -146,23 +146,60 @@ export const setClaimable = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Call setClaimableAmount with default amount
-    const result = await web3Utils.setClaimableAmount(walletAddress, DEFAULT_SET_CLAIMABLE_AMOUNT);
+    // Process each wallet
+    let successful = 0;
+    let failed = 0;
+    let alreadyProcessed = 0;
 
-    // Return result as-is
-    if (result.isSuccess) {
-      // Insert into claimable_addresses table
-      try {
-        await supabaseUtils.insertClaimableAddress(walletAddress);
-      } catch (error) {
-        console.error("Error inserting into claimable_addresses:", error);
-        // Continue anyway - don't fail the request
+    for (const walletAddress of walletAddresses) {
+      console.log(`Processing wallet: ${walletAddress}`);
+      
+      // Check if wallet already exists in claimable_addresses
+      const exists = await supabaseUtils.checkWalletExists(walletAddress);
+      if (exists) {
+        console.log(`Wallet already processed, skipping: ${walletAddress}`);
+        alreadyProcessed++;
+        continue;
       }
       
-      res.status(200).json(result);
-    } else {
-      res.status(500).json(result);
+      try {
+        // Call setClaimableAmount with default amount
+        const result = await web3Utils.setClaimableAmount(walletAddress, DEFAULT_SET_CLAIMABLE_AMOUNT);
+
+        if (result.isSuccess) {
+          // Insert into claimable_addresses table
+          try {
+            await supabaseUtils.insertClaimableAddress(walletAddress);
+          } catch (error) {
+            console.error(`Error inserting into claimable_addresses for ${walletAddress}:`, error);
+            // Continue anyway - don't fail the request
+          }
+          
+          console.log(`Successfully processed wallet: ${walletAddress}`);
+          successful++;
+        } else {
+          console.error(`Failed to process wallet: ${walletAddress}`, result.message);
+          failed++;
+        }
+      } catch (error) {
+        console.error(`Error processing wallet ${walletAddress}:`, error);
+        failed++;
+      }
     }
+
+    const total = walletAddresses.length;
+    const messageParts = [`${successful} successful`, `${failed} failed`];
+    if (alreadyProcessed > 0) {
+      messageParts.push(`${alreadyProcessed} already processed`);
+    }
+    
+    res.status(200).json({
+      message: `Processed ${total} wallet(s): ${messageParts.join(', ')}`,
+      total: total,
+      successful: successful,
+      failed: failed,
+      already_processed: alreadyProcessed
+    });
   } catch (error) {
     console.error("Error in setClaimable:", error);
     res.status(500).json({ 
