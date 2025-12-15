@@ -94,11 +94,60 @@ export default class SupabaseUtils {
     }
   }
 
-  async updateAuraCard(supabaseId: string, tokenId: number) {
+  async getWalletStatus(walletAddress: string) {
+    try {
+      const { data: walletStatus, error } = await this.supabase
+        .from("wallets_status")
+        .select("*")
+        .eq("wallet_address", walletAddress)
+        .single();
+
+      if (error) {
+        console.error(`Error fetching wallet status:`, error);
+        return null;
+      }
+
+      if (!walletStatus) {
+        console.log(`No wallet status found for address: ${walletAddress}`);
+        return null;
+      }
+
+      return walletStatus;
+    } catch (error) {
+      console.log("ERROR FETCHING WALLET STATUS: ", error);
+      return null;
+    }
+  }
+
+  async getWalletTokenStatus(walletAddress: string) {
+    try {
+      const { data: walletTokenStatus, error } = await this.supabase
+        .from("wallet_token_status")
+        .select("*")
+        .eq("wallet_address", walletAddress);
+
+      if (error) {
+        console.error(`Error fetching wallet token status:`, error);
+        return null;
+      }
+
+      if (!walletTokenStatus || walletTokenStatus.length === 0) {
+        console.log(`No wallet token status found for address: ${walletAddress}`);
+        return null;
+      }
+
+      return walletTokenStatus;
+    } catch (error) {
+      console.log("ERROR FETCHING WALLET TOKEN STATUS: ", error);
+      return null;
+    }
+  }
+
+  async updateAuraCard(supabaseId: string, tokenId: number, metadata: any) {
     try {
       const { data, error } = await this.supabase
         .from("aura_card")
-        .update({ minted: true, nft_id: tokenId })
+        .update({ minted: true, nft_id: tokenId, metadata: metadata })
         .eq("id", supabaseId)
         .select();
 

@@ -77,12 +77,34 @@ async function main() {
   let latestBlockNumber = 0;
   for (const event of pastEventsResp.events) {
     // const returns = event.returnValues;
-    const minterAddress = event.returnValues.minter;
+    const minterAddress = event.returnValues.minter.toLowerCase();
     const tokenId = Number(event.returnValues.tokenId);
     const supabaseId = event.returnValues.supabase_uuid;
     const blocknumber = Number(event.blockNumber);
 
-    const updateResult = await supabaseUtils.updateAuraCard(supabaseId, tokenId);
+    // Fetch wallet status and token status for the minter
+    const walletStatus = await supabaseUtils.getWalletStatus(minterAddress);
+    const walletTokenStatus = await supabaseUtils.getWalletTokenStatus(minterAddress);
+
+    // Generate JSON with wallet metrics
+    const walletMetrics = {
+      volume_daily: walletStatus?.volume_daily ?? null,
+      volume_weekly: walletStatus?.volume_weekly ?? null,
+      volume_monthly: walletStatus?.volume_monthly ?? null,
+      token_transfer_count_daily: walletTokenStatus
+        ? walletTokenStatus.reduce((sum: number, token: any) => sum + (Number(token.token_transfer_count_daily) || 0), 0)
+        : null,
+      token_transfer_count_weekly: walletTokenStatus
+        ? walletTokenStatus.reduce((sum: number, token: any) => sum + (Number(token.token_transfer_count_weekly) || 0), 0)
+        : null,
+      token_transfer_count_monthly: walletTokenStatus
+        ? walletTokenStatus.reduce((sum: number, token: any) => sum + (Number(token.token_transfer_count_monthly) || 0), 0)
+        : null,
+    };
+
+    console.log(`Wallet metrics for ${minterAddress}:`, JSON.stringify(walletMetrics, null, 2));
+
+    const updateResult = await supabaseUtils.updateAuraCard(supabaseId, tokenId, walletMetrics);
     if (!updateResult.isSuccess) {
       console.error(`Error updating aura card: ${updateResult.errorMessage}`);
       continue;
@@ -105,7 +127,7 @@ setTimeout(async () => {
   // Define a function to run main() and schedule itself again after 30000ms
   const run = async () => {
     await main(); // Process events
-    setTimeout(run, 30000); // Schedule the next run after 30000ms (30 seconds)
+    setTimeout(run, 15000); // Schedule the next run after 30000ms (30 seconds)
   };
   run(); // Start the loop
-}, 35000); // Initial delay of 35000ms (35 second) before starting
+}, 3000); // Initial delay of 35000ms (35 second) before starting
