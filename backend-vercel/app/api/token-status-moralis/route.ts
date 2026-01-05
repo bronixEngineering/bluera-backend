@@ -6,15 +6,15 @@ export async function POST(request: Request) {
     const { chain = 'base', batchSize = 5, debugAddress } = await request.json().catch(() => ({}));
     const debugLc = typeof debugAddress === 'string' && debugAddress ? String(debugAddress).toLowerCase() : null;
     const debugInfo: any = debugLc
-      ? { token: debugLc, inWhitelist: false, prevVolume: null, aggregatedVolume: 0, updatePath: null, computedRate: null }
+      ? { token: debugLc, inWhitelist: false, prevVolume: null, prevSwaps: null, aggregatedVolume: 0, aggregatedSwaps: 0, updatePath: null, computedRate: null, computedSwapRate: null }
       : null;
 
     const supabase = getSupabaseServerClient();
 
-    // Load whitelist (+ previous total_volume_24h for rate calc)
+    // Load whitelist (+ previous totals for rate calc)
     const { data: whitelistRows, error: whitelistError } = await supabase
       .from('whitelisted_tokens')
-      .select('token_address,total_volume_24h');
+      .select('token_address,total_volume_24h,total_swaps_24h');
     if (whitelistError) {
       return NextResponse.json(
         { success: false, error: `Failed to load whitelisted tokens: ${whitelistError.message}` },
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
     // Maps for case-preserving token and previous volume lookup
     const existingTokenMap = new Map<string, string>();
     const existingVolumeMap = new Map<string, number>();
+    const existingSwapsMap = new Map<string, number>();
 
     (whitelistRows || []).forEach((r: any) => {
       const orig = String(r?.token_address || '');
@@ -42,11 +43,14 @@ export async function POST(request: Request) {
       existingTokenMap.set(lc, orig);
       const prevVol = toNumber(r?.total_volume_24h ?? 0);
       existingVolumeMap.set(lc, prevVol);
+      const prevSwaps = toNumber(r?.total_swaps_24h ?? 0);
+      existingSwapsMap.set(lc, prevSwaps);
     });
 
     if (debugInfo) {
       debugInfo.inWhitelist = existingTokenMap.has(debugLc!);
       debugInfo.prevVolume = existingVolumeMap.has(debugLc!) ? existingVolumeMap.get(debugLc!) : null;
+      debugInfo.prevSwaps = existingSwapsMap.has(debugLc!) ? existingSwapsMap.get(debugLc!) : null;
     }
 
     if (whitelistedAddresses.length === 0) {
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
 
           if (debugInfo && tokenAddress === debugLc) {
             debugInfo.aggregatedVolume = vol24;
+            debugInfo.aggregatedSwaps = totalSwaps24h;
             debugInfo.processedData = {
               buyVolume24h,
               sellVolume24h,
@@ -135,8 +140,16 @@ export async function POST(request: Request) {
             continue;
           }
 
-          const prev = toNumber(existingVolumeMap.get(tokenAddress) ?? 0);
-          const rate = prev > 0 ? (vol24 - prev) / prev : null;
+          const prevVol = toNumber(existingVolumeMap.get(tokenAddress) ?? 0);
+          const volumeRate = prevVol > 0 ? (vol24 - prevVol) / prevVol : null;
+
+          const prevSwaps = toNumber(existingSwapsMap.get(tokenAddress) ?? 0);
+          const swapsRate = prevSwaps > 0 ? (totalSwaps24h - prevSwaps) / prevSwaps : null;
+
+          if (debugInfo && tokenAddress === debugLc) {
+            debugInfo.computedRate = volumeRate;
+            debugInfo.computedSwapRate = swapsRate;
+          }
 
           // Update database with new schema
           const { error: updateErr } = await supabase
@@ -144,7 +157,8 @@ export async function POST(request: Request) {
             .update({
               total_swaps_24h: totalSwaps24h,
               total_volume_24h: vol24,
-              total_volume_changing_rate: rate,
+              total_volume_changing_rate: volumeRate,
+              total_swap_changing_rate: swapsRate,
               last_update: new Date().toISOString(),
               usd_price: usdPrice,
               total_liquidity_usd: totalLiquidityUsd,
@@ -159,6 +173,7 @@ export async function POST(request: Request) {
             updated += 1;
             // Update local maps for rate calculations
             existingVolumeMap.set(tokenAddress, vol24);
+            existingSwapsMap.set(tokenAddress, totalSwaps24h);
           }
 
         } catch (error: any) {
